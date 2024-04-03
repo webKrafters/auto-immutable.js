@@ -1,0 +1,11 @@
+.DS_Store
+.history
+.tgz
+.vscode
+coverage
+debug.log
+dist
+node_modules
+npm-debug.log*
+report.*.json
+docs-dev-copy
