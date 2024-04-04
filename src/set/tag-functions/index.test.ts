@@ -1,4 +1,4 @@
-import type { SourceData } from '../test-artifacts/data/create-data-obj';
+import type { SourceData } from '../../test-artifacts/data/create-data-obj';
 
 import {
 	CLEAR_TAG,
@@ -8,13 +8,13 @@ import {
 	REPLACE_TAG,
 	SET_TAG,
 	SPLICE_TAG
-} from '../constants';
+} from '../../constants';
 
-import { clonedeep } from '../utils';
+import { clonedeep } from '../../utils';
 
 import * as tag from '.';
 
-import createSourceData from '../test-artifacts/data/create-data-obj';
+import createSourceData from '../../test-artifacts/data/create-data-obj';
 
 let state : SourceData;
 let statsStub : {hasChanges: boolean};

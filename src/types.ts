@@ -93,4 +93,6 @@ export interface AccessorPayload {[ propertyPath: string ]: Atom}
 
 import Atom from './model/atom';
 
-export { Immutable, ImmutableFactory } from './';
+export { Immutable } from './immutable';
+
+export { ImmutableFactory } from './';

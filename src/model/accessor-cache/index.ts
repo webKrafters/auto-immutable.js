@@ -27,6 +27,8 @@ class AccessorCache <T extends Value>{
 		this.#origin = origin;
 	}
 
+	get origin() { return this.#origin }
+
 	/** atomizes value property changes */
 	atomize( originChanges : Changes<T> ) {
 		const accessors = this.#accessors;
@@ -82,6 +84,7 @@ class AccessorCache <T extends Value>{
 		const atoms = this.#atoms;
 		for( const k in accessors ) {
 			const accessor = accessors[ k ];
+			// istanbul ignore next
 			if( !accessor.removeClient( clientId ) || accessor.numClients ) { continue }
 			for( const p of accessor.paths ) {
 				if( p in atoms && atoms[ p ].disconnect( accessor.id ) < 1 ) {

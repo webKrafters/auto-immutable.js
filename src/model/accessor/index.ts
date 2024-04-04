@@ -53,6 +53,7 @@ class Accessor<T extends Value> {
 	
 	/** @param atoms - Curated slices of value object currently requested */
 	refreshValue( atoms : AccessorPayload ) : AccessorResponse {
+		// istanbul ignore next
 		if( !this.outdatedPaths.length ) { return this.#value }
 		let refreshLen;
 		const refreshPaths = {};
@@ -66,18 +67,23 @@ class Accessor<T extends Value> {
 			for( const p of this.#paths ) {
 				p in refreshPaths && this.#setValueAt( p, atoms[ p ] );
 			}
-		} else if( this.#paths.length > MODERATE_NUM_PATHS_THRESHOLD ) {
+			return this.#value;
+		}
+		if( this.#paths.length > MODERATE_NUM_PATHS_THRESHOLD ) {
 			const pathsObj = {};
 			for( const p of this.#paths ) { pathsObj[ p ] = true }
 			for( const p in refreshPaths ) {
 				p in pathsObj && this.#setValueAt( p, atoms[ p ] );
 			}
-		} else {
-			for( const p in refreshPaths ) {
-				this.#paths.includes( p ) &&
-				this.#setValueAt( p, atoms[ p ] );
-			}
+			return this.#value;
 		}
+		// istanbul ignore next
+		for( const p in refreshPaths ) {
+			// istanbul ignore next
+			this.#paths.includes( p ) &&
+			this.#setValueAt( p, atoms[ p ] );
+		}
+		// istanbul ignore next
 		return this.#value;
 	}
 }

@@ -12,7 +12,7 @@ import isPlainObject from 'lodash/isplainobject';
 
 import { clonedeep, isDataContainer } from '../utils';
 
-import tagFunctions, { isArrayOnlyTag, isClosedTag } from '../tag-functions';
+import tagFunctions, { isArrayOnlyTag, isClosedTag } from './tag-functions';
 
 export default setValue;
 

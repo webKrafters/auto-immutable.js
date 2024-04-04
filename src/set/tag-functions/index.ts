@@ -1,4 +1,4 @@
-import type { BaseType, Value, Tag as TagKey, TagCommand, UpdateStats as Stats } from '../types'; 
+import type { BaseType, Value, Tag as TagKey, TagCommand, UpdateStats as Stats } from '../../types'; 
 
 type Predicate = (
 	value : Value,
@@ -35,9 +35,9 @@ import {
 	REPLACE_TAG,
 	SET_TAG,
 	SPLICE_TAG
-} from '../constants';
+} from '../../constants';
 
-import { clonedeep, getProperty, isDataContainer } from '../utils/index';
+import { clonedeep, getProperty, isDataContainer } from '../../utils/index';
 
 /**
  * Sets a value slice to its empty value equivalent
