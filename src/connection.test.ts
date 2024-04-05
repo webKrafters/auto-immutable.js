@@ -1,7 +1,7 @@
 import AccessorCache from "./model/accessor-cache";
-import { Immutable } from "./immutable";
+import { deps, Connection } from "./connection";
 
-describe( 'Immutable class', () => {
+describe( 'Connection class', () => {
     let iCacheGetSpy, iCacheUnlinkSpy;
     beforeAll(() => {
         iCacheGetSpy = jest
@@ -19,31 +19,27 @@ describe( 'Immutable class', () => {
         iCacheGetSpy.mockRestore();
         iCacheUnlinkSpy.mockRestore();
     });
-    test( 'constructs an immutable instance', () => {
+    test( 'constructs an immutable connection instance', () => {
         const expectedId = expect.any( String );
-        const im = new Immutable(
+        const cn = new Connection(
             expectedId,
-            expect.any( AccessorCache ),
-            expect.any( Function )
+            expect.any( AccessorCache )
         );
-        expect( im.instanceId ).toBe( expectedId );
-        expect( im.disposed ).toBe( false );
+        expect( cn.instanceId ).toBe( expectedId );
+        expect( cn.disconnected ).toBe( false );
     } );
     test(
         'gets from cache value(s) located at properyPath(s)',
         () => {
             const expectedId = expect.any( String );
-            const im =new Immutable(
+            const cn = new Connection(
                 expectedId,
-                new AccessorCache({}),
-                expect.any( Function )
+                new AccessorCache({})
             );
             const popertyPaths = [ '1', '2', '3', '4' ];
-            im.get( ...popertyPaths );
+            cn.get( ...popertyPaths );
             expect( iCacheGetSpy ).toHaveBeenCalledTimes( 1 );
-            expect( iCacheGetSpy ).toHaveBeenCalledWith(
-                expectedId, ...popertyPaths
-            )
+            expect( iCacheGetSpy ).toHaveBeenCalledWith( expectedId, ...popertyPaths );
         }
     );
     test(
@@ -51,56 +47,57 @@ describe( 'Immutable class', () => {
         () => {
             const expectedId = expect.any( 'TEST_ID' );
             const expectedSourceData = expect.any( Object );
-            const updater = jest.fn();
+            const origSetter = deps.setValue;
+            deps.setValue = jest.fn();
             const updateCompleteListener = expect.any( Function );
             const changes = expect.any( Object );
-            const im = new Immutable(
+            const cn = new Connection(
                 expectedId,
-                new AccessorCache( expectedSourceData ),
-                updater
+                new AccessorCache( expectedSourceData )
             );
-            im.set( changes, updateCompleteListener );
-            expect( updater ).toHaveBeenCalledTimes( 1 );
-            expect( updater ).toHaveBeenCalledWith(
+            cn.set( changes, updateCompleteListener );
+            expect( deps.setValue ).toHaveBeenCalledTimes( 1 );
+            expect( deps.setValue ).toHaveBeenCalledWith(
                 expectedSourceData,
                 changes,
                 updateCompleteListener
             );
+            deps.setValue = origSetter;
         }
     );
-    describe( 'disposal', () => {
+    describe( 'disconnection', () => {
         test(
-            'discards internally held refs and sets `disposed` flag',
+            'discards internally held refs and sets `disconnected` flag',
             () => {
-                const updateFn = jest.fn();
-                const im = new Immutable(
+                const origSetter = deps.setValue;
+                deps.setValue = jest.fn();
+                const cn = new Connection(
                     expect.any( String ),
-                    new AccessorCache( expect.any( Object ) ),
-                    updateFn
+                    new AccessorCache( expect.any( Object ) )
                 )
-                im.dispose();
-                expect( im.disposed ).toBe( true );
-                im.get( expect.any( Array ) );
+                cn.disconnect();
+                expect( cn.disconnected ).toBe( true );
+                cn.get( expect.any( Array ) );
                 expect( iCacheGetSpy ).not.toHaveBeenCalled();
-                im.set( {}, jest.fn() );
-                expect( updateFn ).not.toHaveBeenCalled();
+                cn.set( {}, jest.fn() );
+                expect( deps.setValue ).not.toHaveBeenCalled();
+                deps.setValue = origSetter;
             }
         );
         test(
-            'once disposed ignores further disposal request',
+            'once disconnected ignores further disconnection requests',
             () => {
-                const im = new Immutable(
+                const cn = new Connection(
                     expect.any( String ),
-                    new AccessorCache( expect.any( String ) ),
-                    expect.any( Function )
+                    new AccessorCache( expect.any( String ) )
                 )
-                im.dispose();
+                cn.disconnect();
                 expect( iCacheUnlinkSpy ).toHaveBeenCalledTimes( 1 );
                 iCacheUnlinkSpy.mockClear();
-                im.dispose();
+                cn.disconnect();
                 expect( iCacheUnlinkSpy ).not.toHaveBeenCalled();
                 iCacheUnlinkSpy.mockClear();
-                im.dispose();
+                cn.disconnect();
                 expect( iCacheUnlinkSpy ).not.toHaveBeenCalled();
             }
         );

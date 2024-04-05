@@ -1,37 +1,22 @@
-import type { Changes, Listener, Value } from './types';
-
-type Updater = typeof setValue;
-
-import setValue from './set';
+import type { Value } from './types';
 
 import AccessorCache from './model/accessor-cache';
 
-import { Immutable } from './immutable';
+import { Connection } from './connection';
 
-export const deps = { setValue };
+export const deps = { numCreated: 0 };
 
-export class ImmutableFactory<T extends Value = Value> {
+export class Immutable<T extends Value = Value> {
     #cache : AccessorCache<T>;
-    #lastCount = -1;
-    #updater : Updater;
+    #numConnectionsCreated = 0;
     constructor( initValue : T ) {
         this.#cache = new AccessorCache<T>( initValue );
-        this.#updater = <T>(
-            value : T,
-            changes : Changes<T>,
-            onComplete?: Listener
-        ) => deps.setValue( value, changes, changes => {
-            // istanbul ignore next
-            this.#cache.atomize( changes );
-            // istanbul ignore next
-            onComplete?.( changes );
-        } );
+        deps.numCreated++;
     }
-    getInstance() {
-        return new Immutable<T>(
-            `${ ++this.#lastCount }`,
-            this.#cache,
-            this.#updater
+    connect() {
+        return new Connection<T>(
+            `${ deps.numCreated }:${ ++this.#numConnectionsCreated }`,
+            this.#cache
         );
     }
 }

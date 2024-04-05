@@ -30,8 +30,9 @@ describe( 'AccessorCache class', () => {
 	const cache = new AccessorCache( source );
 	describe( 'atomize(...)', () => {
 		const CLIENT_ID = 'TEST_AUTO_UPDATED';
-		let newChanges, latestFetchedSlice, origFetchedSlice, oldValues, registeredDay;
+		let newChanges, latestFetchedSlice, origFetchedSlice, oldValues, registeredDay, source;
 		beforeAll(() => {
+			source = cache.origin;
 			registeredDay = source.registered.day;
 			newChanges = {
 				friends: { 1: { name: { first: 'Amanda' } } },
@@ -112,7 +113,7 @@ describe( 'AccessorCache class', () => {
 				expect( 'registered.day' in latestFetchedSlice ).toBe( false );
 			}
 		);
-		test( 'will accepts array of update payloads', () => {
+		test( 'will accept array of update payloads', () => {
 			const source = createSourceData();
 			const cache = new AccessorCache( source );
 			const existingVal = cache.get( CLIENT_ID, 'nullTester', 'tags' );

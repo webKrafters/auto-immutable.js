@@ -1,4 +1,4 @@
-const { ImmutableFactory } = require( './dist' );
+const { Immutable } = require( './dist' );
 
-module.exports.ImmutableFactory = ImmutableFactory;
-module.exports = { ImmutableFactory };
+module.exports.Immutable = Immutable;
+module.exports = { Immutable };

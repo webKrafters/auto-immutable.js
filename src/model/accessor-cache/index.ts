@@ -10,13 +10,13 @@ import isEqual from 'lodash/isequal';
 
 import { GLOBAL_SELECTOR } from '../../constants';
 
-import { getProperty } from '../../utils';
+import { clonedeep, getProperty } from '../../utils';
 
 import Atom from '../atom';
 import Accessor from '../accessor';
 
 class AccessorCache <T extends Value>{
-	#accessors : {[propertyPaths: string]: Accessor<T>};
+	#accessors : {[propertyPaths: string]: Accessor};
 	#atoms : AccessorPayload;
 	#origin : T;
 
@@ -24,6 +24,8 @@ class AccessorCache <T extends Value>{
 	constructor( origin : T ) {
 		this.#accessors = {};
 		this.#atoms = {};
+		// @debug
+		// this.#origin = clonedeep( origin );
 		this.#origin = origin;
 	}
 
@@ -99,9 +101,9 @@ class AccessorCache <T extends Value>{
 	#createAccessor(
 		cacheKey : string,
 		propertyPaths : Array<string>
-	) : Accessor<T> {
+	) : Accessor {
 		const atoms = this.#atoms;
-		const accessor = new Accessor( this.#origin, propertyPaths );
+		const accessor = new Accessor( propertyPaths );
 		this.#accessors[ cacheKey ] = accessor;
 		for( const path of accessor.paths ) {
 			if( !( path in atoms ) ) {

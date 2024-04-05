@@ -1,5 +1,3 @@
-export default null;
-
 import {
     CLEAR_TAG,
     DELETE_TAG,
@@ -39,13 +37,11 @@ export type SpliceTag = typeof SPLICE_TAG;
 
 export type KeyType = number | string | symbol;
 
-type IValue = Partial<{[x: KeyType] : any }>;
-
-export interface Value extends IValue {};
+export interface Value {[x : KeyType]: any};
 
 export interface UpdateStats { hasChanges: boolean };
 
-export type BaseType = Array<any>|{}|boolean|KeyType;
+export type BaseType = Array<any> | boolean | KeyType | Value;
 
 /** As in {"@@CLEAR":*} is a parameterless command. Parameters have not effect */
 export type ClearCommand = {[CLEAR_TAG]: any};
@@ -79,20 +75,20 @@ export type TagCommand<T extends Tag, P extends Value = Value> =
 	T extends SetTag ? SetCommand :
 	T extends SpliceTag ? SpliceCommand : never;
 
-export type Changes<T extends Value> = UpdatePayload<T>|UpdatePayloadArray<T>;
-
-export type UpdatePayload<T> = T | ClearTag | ClearCommand | DeleteCommand<T> | MoveCommand | PushCommand | ReplaceCommand | SetCommand | SpliceCommand | {} | Partial<{[K in keyof T]: UpdatePayload<T[K]>}>
-
-export type UpdatePayloadArray<T> = Array<UpdatePayload<T>>;
-
-export type Listener = <T extends Value>(changes : Changes<T>) => void;
+export interface AccessorPayload {[ propertyPath: string ]: Atom};
 
 export interface AccessorResponse {[ propertyPaths: string ]: Readonly<any>};
 
-export interface AccessorPayload {[ propertyPath: string ]: Atom}
+export type Changes<T extends Value> = UpdatePayload<T> | UpdatePayloadArray<T>;
+
+export type Listener = <T extends Value>(changes : Changes<T>) => void;
+
+export type UpdatePayload<T> = T | ClearTag | ClearCommand | DeleteCommand<T> | MoveCommand | PushCommand | ReplaceCommand | SetCommand | SpliceCommand | Value | Partial<{[K in keyof T]: UpdatePayload<T[K]>}>
+
+export type UpdatePayloadArray<T> = Array<UpdatePayload<T>>;
 
 import Atom from './model/atom';
 
-export { Immutable } from './immutable';
+export { Connection } from './connection';
 
-export { ImmutableFactory } from './';
+export { Immutable } from '.';

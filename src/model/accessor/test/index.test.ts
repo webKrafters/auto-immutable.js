@@ -20,7 +20,7 @@ describe( 'Accessor class', () => {
 		'registered.time.hours',
 		'tags[4]'
 	]) as Array<string>;
-	const accessor = new Accessor( source, accessedPropertyPaths );
+	const accessor = new Accessor( accessedPropertyPaths );
 	const SET_ERROR = propName => `Cannot set property ${ propName } of #<Accessor> which has only a getter`;
 	test( 'creates an accessor', () => expect( accessor ).toBeInstanceOf( Accessor ) );
 	describe( 'numClients property', () => {
@@ -32,7 +32,7 @@ describe( 'Accessor class', () => {
 	} );
 	describe( 'id property', () => {
 		test( 'holds an incremental unique integer value', () => {
-			const testAccessor = new Accessor( source, accessedPropertyPaths );
+			const testAccessor = new Accessor( accessedPropertyPaths );
 			expect( testAccessor.id ).toBeGreaterThan( accessor.id );
 		} );
 		test( 'is privately mutable only', () => expect(() => {
@@ -136,7 +136,7 @@ describe( 'Accessor class', () => {
 				a[ p ] = new Atom( getProperty( state, p ).value );
 				return a;
 			}, {});
-			accessor = new Accessor( source, accessedPropertyPaths );
+			accessor = new Accessor( accessedPropertyPaths );
 			initVal = accessor.value;
 			retVal = accessor.refreshValue( createAccessorAtoms( source ) );
 			runTest = createAccessor => {
@@ -149,7 +149,7 @@ describe( 'Accessor class', () => {
 				};
 				const updatedPaths = Object.keys( updates );
 				const accessedPropertyPaths = [ 'id', ...updatedPaths, 'company', 'email', 'eyeColor', 'favoriteFruit', 'friends.name' ];
-				const accessor = createAccessor( source, accessedPropertyPaths );
+				const accessor = createAccessor( accessedPropertyPaths );
 				const atomMap = createAccessorAtoms( source, accessedPropertyPaths );
 				accessor.refreshValue( atomMap );
 				updatedPaths.forEach( p => {
@@ -170,7 +170,7 @@ describe( 'Accessor class', () => {
 			expect( Object.values( accessor.value ).every( isReadonly ) ).toBe( true );
 		} );
 		describe( 'attempts to reference non-existent atoms', () => {
-			test( 'are ignored', () => runTest(( source, accessedPropertyPaths ) => new Accessor( source, [ ...accessedPropertyPaths, 'UNKNOWN' ] )) );
+			test( 'are ignored', () => runTest( accessedPropertyPaths => new Accessor([ ...accessedPropertyPaths, 'UNKNOWN' ])) );
 		} );
 		describe( 'when updated paths < resident accessor paths while resident accessor paths > MODERATE_NUM_PATHS_THRESHOLD', () => {
 			// @ts-expect-error
@@ -178,5 +178,3 @@ describe( 'Accessor class', () => {
 		} );
 	} );
 } );
-
-/** @typedef {{[x:string]: Atom}} Atoms */

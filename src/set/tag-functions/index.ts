@@ -10,7 +10,7 @@ type TaggedChanges<
 	T extends Array<any> | Value,
 	K extends keyof T,
 	TAG extends TagKey
-> = Array<TagCommand<TAG, T> | BaseType> | Partial<T & {[P in K]: TagCommand<TAG, T> & {}}>
+> = Array<TagCommand<TAG, T> | BaseType> | Partial<T & {[P in K]: TagCommand<TAG, T> & Value}>
 
 type TagFunction = <
 	T extends Array<any> | Value,
@@ -409,7 +409,7 @@ const finishTagRequest = (() => {
 	function runCloser( changes : Array<any>, key : number, tag : TagKey ) : void;
 	function runCloser( changes : Value, key : string, tag : TagKey ) : void;
 	function runCloser( changes : Value, key : symbol, tag : TagKey ) : void;
-	function runCloser( changes : any, key : any, tag : any ) : void {
+	function runCloser( changes, key, tag ) : void {
 		if( isClosedTag( tag ) ) { return end( changes, key ) }
 		let keyCount = 0;
 		for( const k in changes[ key ] ) { // eslint-disable-line no-unused-vars

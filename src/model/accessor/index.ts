@@ -8,25 +8,22 @@ import type Atom from '../atom';
 
 const MODERATE_NUM_PATHS_THRESHOLD = 8;
 
-class Accessor<T extends Value> {
+class Accessor {
 
 	static #NUM_INSTANCES = 0;
 
 	#clients : Set<string>;
 	#id : number;
 	#paths : Array<string>;
-	#source : T;
 	#value : AccessorResponse;
 
 	public outdatedPaths : Array<string>;
 
-	/** @param source - Value object reference from which the accessedPropertyPaths are to be selected. */
-	constructor( source : T, accessedPropertyPaths : Array<string> ) {
+	constructor( accessedPropertyPaths : Array<string> ) {
 		this.#clients = new Set();
 		this.#id = ++Accessor.#NUM_INSTANCES;
 		this.#paths = Array.from( new Set( accessedPropertyPaths ) );
 		this.outdatedPaths = this.#paths.slice();
-		this.#source = source;
 		this.#value = {};
 	}
 
