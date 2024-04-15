@@ -1,37 +1,64 @@
-# auto-immutable
-Self enforcing immutable class. 
+# Auto Immutable JS
 
-
-
-
-// -----
-
-
-# Long Count 
-<p align="center" height="200" min-width="320" padding="20">
-    <img src="logo.svg" style="border:1px solid #ffffff"></img>
+<p align="center" height="20" width="20" padding="20">
+    <img src="docs/src/images/logo.svg" height="240" width="640"
+    i-style="border:1px solid #ffffff" --
+    ></img>
 </p>
 
 # Introduction
-**Long Count** is a library of **`setInterval`** and **`setTimeout`** functions producing a **`LongCounter`** instance capable of handling superbly long delay times and surviving device sleep and wake cycles.
+**Auto Immutable** is a self enforcing immutable class. Its values are private and readonly.
+<ul>
+    <li>
+        It can only ever be <strong>updated</strong> by its <strong><code>set(...)</code></strong> method.
+    </li>
+    <li>
+        It can only ever be <strong>read</strong> by its <strong><code>get(...)</code></strong> method.
+    </li>
+</ul>
 
 ### Name:
-<strong>@webkrafters/long-count</strong><br />
-<strong>Alternate:</strong> long-count.js
+<strong>@webkrafters/auto-immutable</strong><br />
+<strong>Alternate:</strong> auto-immutable.js
 
 # Installation
-npm install --save @webkrafters/long-count
+npm install --save @webkrafters/auto-immutable
 
-# Usage
+# Getting Started
 
-## Timeout
+## Obtain Immutable Instance
 
 ```tsx
-import type {
-    Delay,
-    Options,
-    VoidFn
-} from '@webkrafters/long-count';
+// my-immutable.ts
+
+import type { Immutable } from '@webkrafters/auto-immutable';
+
+const initValue = { a: { b: { c: 24 } } };
+
+const immutable = new Immutable( initValue );
+
+export default immutable;
+```
+
+## Access Immutable instance
+
+```tsx
+// read-my-immutable.ts
+
+import myImmutable from './my-immutable';
+
+const reference = myImmutable.connect();
+
+const objectPath = 'a.b.c';
+
+const data : AccessorResponse = reference.get( objectPath );
+
+console.log( data ); // {'a.b.c', 24}
+```
+
+
+
+
 
 import {
     clearTimeout,
