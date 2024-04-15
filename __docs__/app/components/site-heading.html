@@ -1,0 +1,32 @@
+
+<button { ...siderSwitchProps }></button>
+<div className="branding">
+    <a class="logo-link" href="/">
+        <img alt="Logo" className="logo" src="/img/logo.png" />
+    </a>
+    <div className="text">
+        <span className="brand">
+            <a
+                href="https://github.com/webKrafters/auto-immutable"
+                rel="noopener noreferrer"
+                target="_blank"
+            >
+                Auto Immutable
+            </Anchor>
+        </span>
+        <span className="name">
+            <a
+                href="https://www.npmjs.com/package/@webkrafters/auto-immutable"
+                rel="noopener noreferrer"
+                target="_blank"
+            >
+                Auto-Immutable
+            </a>
+        </span>
+    </div>
+</div>
+<SiteTags />
+<DarkModeSetting
+    defaultValue={ defaultDarkModeSetting }
+    onChange={ onDarkModeChange }
+/>
