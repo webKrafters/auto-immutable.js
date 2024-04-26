@@ -10,7 +10,7 @@ import isEqual from 'lodash/isequal';
 
 import { GLOBAL_SELECTOR } from '../../constants';
 
-import { clonedeep, getProperty } from '../../utils';
+import { getProperty } from '../../utils';
 
 import Atom from '../atom';
 import Accessor from '../accessor';

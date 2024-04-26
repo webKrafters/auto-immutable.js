@@ -1,6 +1,5 @@
-import { Connection } from "./connection";
-import { deps, Immutable } from ".";
-import { GLOBAL_SELECTOR } from "./constants";
+import { Connection } from './connection';
+import { Immutable } from '.';
 
 describe( 'Immutable class', () => {
     test( 'creates an shareable Immutable instance', () => {
