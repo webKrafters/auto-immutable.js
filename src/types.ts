@@ -37,11 +37,20 @@ export type SpliceTag = typeof SPLICE_TAG;
 
 export type KeyType = number | string | symbol;
 
-export interface Value {[x : KeyType]: any};
+export type ScalarType = boolean | KeyType;
+
+export interface Cloneable {
+    clone?: ( ...args : Array<any> ) => any;
+    cloneNode?: ( ...args : Array<any> ) => any
+}
+
+export interface Value extends Cloneable {
+    [x: KeyType]: ScalarType | Value | Function | {}
+}
 
 export interface UpdateStats { hasChanges: boolean };
 
-export type BaseType = Array<any> | boolean | KeyType | Value;
+export type BaseType = Array<any> | ScalarType | Value;
 
 /** As in {"@@CLEAR":*} is a parameterless command. Parameters have not effect */
 export type ClearCommand = {[CLEAR_TAG]: any};

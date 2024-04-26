@@ -7,11 +7,11 @@ import type { Value } from './types';
 
 import * as _constants from './constants';
 
+import { clonedeep } from './utils';
+
 import AccessorCache from './model/accessor-cache';
 
 import { Connection } from './connection';
-
-import { clonedeep } from './utils';
 
 export const constants = _constants;
 
