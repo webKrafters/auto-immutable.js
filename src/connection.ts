@@ -1,4 +1,10 @@
-import type { Changes, Listener, Value } from './types';
+import type {
+    Changes,
+    Listener,
+    UpdatePayload,
+    UpdatePayloadArray,
+    Value
+} from './types';
 
 import setValue from './set';
 
@@ -30,12 +36,12 @@ export class Connection<T extends Value> {
         return this.#cache.get( this.#id, ...propertyPaths );
     }
     @invoke
-    set( changes : Changes<T>, onComplete: Listener = deps.noop ) {
+    set( changes : Changes<T>, onComplete: Listener = deps.noop ) : void {
         deps.setValue(
             this.#cache.origin,
             changes,
             changes => {
-                this.#cache.atomize( changes );
+                this.#cache.atomize( changes as UpdatePayload<T> | UpdatePayloadArray<T> );
                 onComplete( changes );
             }
         );

@@ -1,4 +1,6 @@
-import type { Value } from '../types';
+import type { Changes } from '../types';
+
+import type { SourceData } from '../test-artifacts/data/create-data-obj';
 
 import {
 	CLEAR_TAG,
@@ -16,8 +18,10 @@ import setValue from '.';
 
 import createSourceData from '../test-artifacts/data/create-data-obj';
 
+type Value = Partial<SourceData>
+
 describe( 'setValue(...)', () => {
-	const value = createSourceData();
+	const value : Value = createSourceData();
 	describe( 'basics', () => {
 		let newAge, changes, onChangeMock, prevAge;
 		beforeAll(() => {
@@ -35,8 +39,7 @@ describe( 'setValue(...)', () => {
 		} );
 	} );
 	describe( 'attempt resulting in value change', () => {
-		let onChangeMock, registered;
-		let changes : Partial<Value>;
+		let onChangeMock, registered, changes;
 		beforeAll(() => {
 			onChangeMock = jest.fn();
 			registered = clonedeep( value.registered );
@@ -55,14 +58,15 @@ describe( 'setValue(...)', () => {
 		});
 		afterAll(() => { value.registered = registered });
 		test( 'updates only new incoming changes', () => {
-			expect( value.registered.time ).toStrictEqual( registered.time );
+			expect( value.registered?.time ).toStrictEqual( registered.time );
 			[ 'day', 'year' ].forEach( k => {
-				expect( value.registered[ k ] ).not.toEqual( registered[ k ] );
-				expect( value.registered[ k ] ).toBe( changes.registered[ k ] );
+				expect( value.registered?.[ k ] ).not.toEqual( registered[ k ] );
+				const _changes = changes as ( typeof changes & { registered: {} } );
+				expect( value.registered?.[ k ] ).toBe( _changes.registered[ k ] );
 			} );
 			const value2 = createSourceData();
 			const registered2 = clonedeep<typeof value2["registered"]>( value2.registered );
-			const changes2 = clonedeep<typeof changes>( changes );
+			const changes2 = clonedeep( changes ) as Changes<typeof value2> & Pick<typeof value2, "registered">;
 			changes2.registered.time.hours = 17; // also add new `hours` value update to `time` object
 			setValue( value2, changes2 );
 			expect( value2.registered.time ).not.toEqual( registered2.time );
@@ -102,7 +106,7 @@ describe( 'setValue(...)', () => {
 		} );
 	} );
 	test( 'sequentially processes array of update payloads', () => {
-		const value = createSourceData();
+		const value : Value = createSourceData();
 		setValue( value, [
 			{ tags: { [ PUSH_TAG ]: [ '_88_' ] } },
 			{ tags: { [ MOVE_TAG ]: [ 0, 2 ] } },
@@ -122,7 +126,7 @@ describe( 'setValue(...)', () => {
 	} );
 	describe( 'array value subtree', () => {
 		test( 'is wholly replaced if new value is neither an array nor an indexed object', () => {
-			const value = createSourceData();
+			const value = createSourceData() as typeof value & { friends : string };
 			const friends = 'TEST FRIEND STUB';
 			setValue( value, { friends } );
 			expect( value.friends ).toBe( friends );
@@ -149,12 +153,12 @@ describe( 'setValue(...)', () => {
 				expect( Array.isArray( value.friends ) ).toBe( true );
 			} );
 			test( 'updates value with new changes', () => {
-				expect( value.friends[ 0 ] ).toEqual( origFriendsSlice[ 0 ] ); // remains untouched
-				expect( value.friends[ 1 ].name.first ).toBe( changes.friends[ 1 ].name.first );
-				expect( value.friends[ 2 ] ).toEqual( changes.friends[ -1 ] );
+				expect( value.friends?.[ 0 ] ).toEqual( origFriendsSlice[ 0 ] ); // remains untouched
+				expect( value.friends?.[ 1 ].name.first ).toBe( changes.friends[ 1 ].name.first );
+				expect( value.friends?.[ 2 ] ).toEqual( changes.friends[ -1 ] );
 			} );
 			test( 'recognizes update by negative indexing', () => {
-				expect( value.friends[ 2 ] ).toEqual( changes.friends[ -1 ] );
+				expect( value.friends?.[ 2 ] ).toEqual( changes.friends[ -1 ] );
 			} );
 			test( 'notifies listeners of value changes', () => {
 				expect( onChangeMock ).toHaveBeenCalledTimes( 1 );
@@ -183,16 +187,16 @@ describe( 'setValue(...)', () => {
 			} );
 			test( 'leaves existing items untouched', () => {
 				origFriendsSlice.forEach(( f, i ) => {
-					expect( value.friends[ i ] ).toEqual( f );
+					expect( value.friends?.[ i ] ).toEqual( f );
 				});
 			} );
 			test( 'creates `undefined` entries for any unoccupied indexes leading the new entry', () => {
 				for( let i = origFriendsSlice.length; i < newEntryIndex; i++ ) {
-					expect( value.friends[ i ] ).toBe( undefined );
+					expect( value.friends?.[ i ] ).toBe( undefined );
 				}
 			} );
 			test( 'places new entry at the referenced index', () => {
-				expect( value.friends[ newEntryIndex ] ).toEqual( changes.friends[ newEntryIndex ] );
+				expect( value.friends?.[ newEntryIndex ] ).toEqual( changes.friends[ newEntryIndex ] );
 			} );
 			test( 'notifies listeners of value changes', () => {
 				expect( onChangeMock ).toHaveBeenCalledTimes( 1 );
@@ -202,7 +206,7 @@ describe( 'setValue(...)', () => {
 		describe( 'using indexed object resulting in no new change', () => {
 			let changes, onChangeMock, origPlacesSlice;
 			beforeAll(() => {
-				origPlacesSlice = clonedeep( value.history.places );
+				origPlacesSlice = clonedeep( value.history?.places );
 				changes = {
 					history: {
 						places: {
@@ -216,14 +220,14 @@ describe( 'setValue(...)', () => {
 				onChangeMock = jest.fn();
 				setValue( value, changes, onChangeMock );
 			});
-			afterAll(() => { value.history.places = origPlacesSlice });
+			afterAll(() => { value.history!.places = origPlacesSlice });
 			test( 'maintains structural integrity of the subtree', () => {
-				expect( Array.isArray( value.history.places ) ).toBe( true );
+				expect( Array.isArray( value.history?.places ) ).toBe( true );
 			} );
 			test( 'leaves items untouched', () => {
-				expect( value.history.places ).toHaveLength( origPlacesSlice.length );
+				expect( value.history?.places ).toHaveLength( origPlacesSlice.length );
 				origPlacesSlice.forEach(( p, i ) => {
-					expect( value.history.places[ i ] ).toEqual( p );
+					expect( value.history?.places[ i ] ).toEqual( p );
 				});
 			} );
 			test( 'does not notify listeners due to no value changes', () => {
@@ -270,7 +274,7 @@ describe( 'setValue(...)', () => {
 			afterAll(() => { value.friends = origFriendsSlice });
 			test( 'truncates existing array to new array size', () => {
 				expect( value.friends ).toHaveLength( changes.friends.length );
-				expect( value.friends.length ).toBeLessThan( origFriendsSlice.length );
+				expect( value.friends?.length ).toBeLessThan( origFriendsSlice.length );
 			} );
 			test( 'updates value with new changes', () => {
 				expect( value.friends ).toEqual( changes.friends );
@@ -292,7 +296,7 @@ describe( 'setValue(...)', () => {
 			afterAll(() => { value.friends = origFriendsSlice });
 			test( 'truncates existing array to new array size', () => {
 				expect( value.friends ).toHaveLength( changes.friends.length );
-				expect( value.friends.length ).toBeLessThan( origFriendsSlice.length );
+				expect( value.friends?.length ).toBeLessThan( origFriendsSlice.length );
 			} );
 			test( 'updates value with new changes', () => {
 				expect( value.friends ).toEqual( changes.friends );
@@ -311,7 +315,11 @@ describe( 'setValue(...)', () => {
 					changes = { friends: [] };
 					for( let i = 7; --i; ) {
 						changes.friends.push({
-							id: expect.any( Number ), name: { first: expect.any( String ), last: expect.any( String ) }
+							id: expect.any( Number ),
+							name: {
+								first: expect.any( String ),
+								last: expect.any( String )
+							}
 						});
 					}
 					onChangeMock = jest.fn();
@@ -320,7 +328,7 @@ describe( 'setValue(...)', () => {
 				afterAll(() => { value.friends = origFriendsSlice });
 				test( 'increases existing array size to fit new array items', () => {
 					expect( value.friends ).toHaveLength( changes.friends.length );
-					expect( value.friends.length ).toBeGreaterThan( origFriendsSlice.length );
+					expect( value.friends?.length ).toBeGreaterThan( origFriendsSlice.length );
 				} );
 				test( 'updates value with new changes', () => {
 					expect( value.friends ).toEqual( changes.friends );
@@ -336,9 +344,19 @@ describe( 'setValue(...)', () => {
 				let changes, onChangeMock, lastNewValueEntry, origFriendsSlice, originalNewValueEntry0, originalNewValueEntry1;
 				beforeAll(() => {
 					origFriendsSlice = clonedeep( value.friends );
-					originalNewValueEntry0 = { id: 15, name: { first: 'Sue', last: 'Jones' } };
+					originalNewValueEntry0 = {
+						id: 15,
+						name: {
+							first: 'Sue',
+							last: 'Jones'
+						}
+					};
 					originalNewValueEntry1 = {
-						id: expect.any( Number ), name: { first: expect.any( String ), last: expect.any( String ) }
+						id: expect.any( Number ),
+						name: {
+							first: expect.any( String ),
+							last: expect.any( String )
+						}
 					};
 					lastNewValueEntry = origFriendsSlice[ 0 ];
 					changes = { friends: clonedeep( origFriendsSlice ) };
@@ -351,15 +369,15 @@ describe( 'setValue(...)', () => {
 				afterAll(() => { value.friends = origFriendsSlice });
 				test( 'increases existing array size to fit new array items', () => {
 					expect( value.friends ).toHaveLength( changes.friends.length );
-					expect( value.friends.length ).toBeGreaterThan( origFriendsSlice.length );
+					expect( value.friends?.length ).toBeGreaterThan( origFriendsSlice.length );
 				} );
 				test( 'updates value with new changes', () => {
 					expect( value.friends ).toEqual( changes.friends );
 				} );
 				test( 'maintains 2nd and 3rd elements from previous array', () => {
-					expect( value.friends[ 0 ] ).not.toEqual( origFriendsSlice[ 0 ] );
-					expect( value.friends[ 1 ] ).toEqual( origFriendsSlice[ 1 ] );
-					expect( value.friends[ 2 ] ).toEqual( origFriendsSlice[ 2 ] );
+					expect( value.friends![ 0 ] ).not.toEqual( origFriendsSlice[ 0 ] );
+					expect( value.friends![ 1 ] ).toEqual( origFriendsSlice[ 1 ] );
+					expect( value.friends![ 2 ] ).toEqual( origFriendsSlice[ 2 ] );
 				} );
 				test( 'notifies listeners of updated array entries', () => {
 					expect( onChangeMock ).toHaveBeenCalledTimes( 1 );
@@ -373,11 +391,11 @@ describe( 'setValue(...)', () => {
 		beforeAll(() => { value = createSourceData() });
 		describe( `by the '${ CLEAR_TAG }' tag property key`, () => {
 			test( 'sets the entire value to its default value', () => {
-				let value = createSourceData();
-				setValue( value, CLEAR_TAG );
+				let value : Value = createSourceData();
+				setValue( value, CLEAR_TAG  as Changes<Value> );
 				expect( value ).toEqual({});
 				value = createSourceData();
-				setValue( value, { [ CLEAR_TAG ]: expect.anything() } );
+				setValue( value, { [ CLEAR_TAG ]: expect.anything() }  as Changes<Value> );
 				expect( value ).toEqual({});
 			} );
 			test( 'sets value slices to default values', () => {
@@ -386,16 +404,19 @@ describe( 'setValue(...)', () => {
 					nullableDefaultTester: new Map(),
 					strs: [ 'zero', 'one', 'two', 'three' ]
 				};
-				setValue( _value, {
-					company: CLEAR_TAG,
-					friends: { 1: CLEAR_TAG },
-					history: { places: [ CLEAR_TAG, CLEAR_TAG ] },
-					name: CLEAR_TAG,
-					nullableDefaultTester: CLEAR_TAG,
-					phone: CLEAR_TAG,
-					strs: [ CLEAR_TAG ],
-					tags: CLEAR_TAG
-				} );
+				setValue(
+					_value,
+					{
+						company: CLEAR_TAG,
+						friends: { 1: CLEAR_TAG },
+						history: { places: [ CLEAR_TAG, CLEAR_TAG ] },
+						name: CLEAR_TAG,
+						nullableDefaultTester: CLEAR_TAG,
+						phone: CLEAR_TAG,
+						strs: [ CLEAR_TAG ],
+						tags: CLEAR_TAG
+					} as unknown as Changes<typeof _value>
+				);
 				expect( _value ).toEqual({
 					..._value,
 					company: '',
@@ -409,7 +430,7 @@ describe( 'setValue(...)', () => {
 				});
 			} );
 			test( 'also sets host property to default when present as a key in that property', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				setValue( _value, {
 					company: { [ CLEAR_TAG ]: expect.anything() },
 					friends: { 1: { [ CLEAR_TAG ]: expect.anything() } },
@@ -436,7 +457,11 @@ describe( 'setValue(...)', () => {
 			test( 'ignores non-existent properties', () => {
 				const _value = createSourceData();
 				const onChangeMock = jest.fn();
-				setValue( _value, { testing: CLEAR_TAG }, onChangeMock );
+				setValue(
+					_value,
+					{ testing: CLEAR_TAG } as Changes<Value>,
+					onChangeMock
+				);
 				expect( _value ).toEqual( value );
 				expect( onChangeMock ).not.toHaveBeenCalled();
 			} );
@@ -452,14 +477,18 @@ describe( 'setValue(...)', () => {
 					}
 				};
 				const _value2 = clonedeep( _value );
-				setValue( _value, {
-					friends: CLEAR_TAG,
-					name: CLEAR_TAG,
-					nilValuesTester: {
-						_null: CLEAR_TAG,
-						_undefined: CLEAR_TAG
-					}
-				}, onChangeMock );
+				setValue(
+					_value,
+					{
+						friends: CLEAR_TAG,
+						name: CLEAR_TAG,
+						nilValuesTester: {
+							_null: CLEAR_TAG,
+							_undefined: CLEAR_TAG
+						}
+					} as unknown as Changes<typeof _value>,
+					onChangeMock
+				);
 				expect( _value ).toStrictEqual( _value2 );
 				expect( onChangeMock ).not.toHaveBeenCalled();
 			} );
@@ -468,11 +497,11 @@ describe( 'setValue(...)', () => {
 			test( 'removes all listed top level properties', () => {
 				const value = createSourceData();
 				const removedKeys = [ '_id', 'address', 'friends', 'picture' ];
-				setValue( value, { [ DELETE_TAG ]: removedKeys } );
+				setValue( value, { [ DELETE_TAG ]: removedKeys } as Changes<Value> );
 				expect( removedKeys.every( k => !( k in value ) ) ).toBe( true );
 			} );
 			test( 'removes all listed properties', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				setValue( _value, {
 					friends: { [ DELETE_TAG ]: [ 0, 2 ] },
 					name: { [ DELETE_TAG ]: [ 'first', 'last' ] },
@@ -489,10 +518,20 @@ describe( 'setValue(...)', () => {
 			} );
 			test( 'removes all listed properties from an element and replaces the array with the element', () => {
 				const _value = createSourceData();
-				setValue( _value, {
-					friends: [{ [ DELETE_TAG ]: [ 'name' ] }],
-					history: { places: [ value.history.places[ 0 ], { [ DELETE_TAG ]: [ 'country', 'year' ] } ] }
-				} );
+				setValue(
+					_value,
+					{
+						friends: [
+							{ [ DELETE_TAG ]: [ 'name' ] }
+						],
+						history: {
+							places: [
+								value.history.places[ 0 ],
+								{ [ DELETE_TAG ]: [ 'country', 'year' ] }
+							]
+						}
+					} as unknown as Changes<Value>
+				);
 				expect( _value ).toEqual({
 					...value,
 					friends: [{ id: value.friends[ 0 ].id }],
@@ -505,17 +544,20 @@ describe( 'setValue(...)', () => {
 				});
 			} );
 			test( `throws \`TypeError\` when \`${ DELETE_TAG }\` property value is not an array`, () => {
-				expect(() => setValue( createSourceData(), {
-					company: { [ DELETE_TAG ]: value.company },
-					friends: { 1: { [ DELETE_TAG ]: value.friends } },
-					name: { [ DELETE_TAG ]: value.name },
-					phone: { [ DELETE_TAG ]: value.phone, ...value.phone },
-					tags: { [ DELETE_TAG ]: value.tags }
-				} ) ).toThrow( TypeError );
+				expect(() => {
+					const v : Value = createSourceData();
+					setValue( v, {
+						company: { [ DELETE_TAG ]: value.company },
+						friends: { 1: { [ DELETE_TAG ]: value.friends } },
+						name: { [ DELETE_TAG ]: value.name },
+						phone: { [ DELETE_TAG ]: value.phone, ...value.phone },
+						tags: { [ DELETE_TAG ]: value.tags }
+					} )
+				}).toThrow( TypeError );
 			} );
 			test( `ignores non-existent property keys in the \`${ DELETE_TAG }\` property value`, () => {
 				const onChangeMock = jest.fn();
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				setValue( _value, {
 					friends: { [ DELETE_TAG ]: [ -9, 55, 'test' ] },
 					name: { [ DELETE_TAG ]: [ 'suffix' ] },
@@ -527,7 +569,7 @@ describe( 'setValue(...)', () => {
 			} );
 			test( `ignores \`${ DELETE_TAG }\` property with empty array value`, () => {
 				const onChangeMock = jest.fn();
-				const _value = createSourceData()
+				const _value : Value = createSourceData()
 				setValue( _value, {
 					friends: { [ DELETE_TAG ]: [] },
 					name: { [ DELETE_TAG ]: [] },
@@ -542,7 +584,7 @@ describe( 'setValue(...)', () => {
 			let value;
 			beforeAll(() => { value = createSourceData() });
 			test( 'moves contiguous array items(s) from one index to another', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				setValue( _value, {
 					friends: { [ MOVE_TAG ]: [ 2, 1 ] },
 					tags: { [ MOVE_TAG ]: [ 3, 5, 3 ] }
@@ -554,7 +596,7 @@ describe( 'setValue(...)', () => {
 				});
 			} );
 			test( 'only updates value slices of the array type', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				setValue( _value, {
 					company: { [ MOVE_TAG ]: [ 0, 2 ] }, // non-array `company` value will be ignored
 					friends: { [ MOVE_TAG ]: [ 0, 2 ] }
@@ -563,7 +605,10 @@ describe( 'setValue(...)', () => {
 			} );
 			describe( 'non-optional argument type validation', () => {
 				test( 'only accepts an array value consisting of at least two integers', () => expect(
-					() => setValue( createSourceData(), { friends: { [ MOVE_TAG ]: [ 0, 1 ] } } )
+					() => {
+						const v : Value = createSourceData();
+						setValue( v, { friends: { [ MOVE_TAG ]: [ 0, 1 ] } } );
+					}
 				).not.toThrow( TypeError ) );
 				test.each([
 					[ null ], [ undefined ], [ '' ], [ 'test' ], [ {} ], [ { test: expect.anything() } ],
@@ -575,7 +620,7 @@ describe( 'setValue(...)', () => {
 			} );
 			describe( 'optional third argumemt', () => {
 				test( 'accepts a positive integer value for number of contiguous elements to move', () => {
-					const _value = createSourceData();
+					const _value : Value = createSourceData();
 					setValue( _value, { friends: { [ MOVE_TAG ]: [ 0, 2, 2 ] } } );
 					expect( _value ).toEqual({
 						...value,
@@ -586,14 +631,14 @@ describe( 'setValue(...)', () => {
 					[ 'negative integers', -2 ], [ 'zero', 0 ], [ 'fractions', 0.5 ],
 					[ 'non-integer values', true ], [ 'non-numeric values', '2' ]
 				])( 'ignores %p', ( desc, numItems ) => {
-					const _value = createSourceData();
+					const _value : Value = createSourceData();
 					const onChangeMock = jest.fn();
 					setValue( _value, { friends: { [ MOVE_TAG ]: [ 0, 2, numItems ] } }, onChangeMock );
 					expect( _value ).toEqual( value );
 					expect( onChangeMock ).not.toHaveBeenCalled();
 				} );
 				test( 'moves contiguous elements from fromIndex to end of array when argument value exceeds array length', () => {
-					const _value = createSourceData();
+					const _value : Value = createSourceData();
 					setValue( _value, { friends: { [ MOVE_TAG ]: [ 1, 0, 3 ] } } );
 					expect( _value ).toEqual({
 						...value,
@@ -605,14 +650,17 @@ describe( 'setValue(...)', () => {
 				let calcExpected;
 				beforeAll(() => {
 					value = createSourceData();
-					calcExpected = indexes => ({ ...value, friends: indexes.map( i => value.friends[ i ] ) });
+					calcExpected = indexes => ({
+						...value,
+						friends: indexes.map( i => value.friends[ i ] )
+					});
 				});
 				test.each([
 					[ -1, 0, [ 2, 0, 1 ] ],
 					[ 2, -2, [ 0, 2, 1 ] ],
 					[ -2, -1, [ 0, 2, 1 ] ]
 				])( 'accepts negative index in args %d and %d', ( from, to, expectedIndexes ) => {
-					const _value = createSourceData();
+					const _value : Value = createSourceData();
 					setValue( _value, { friends: { [ MOVE_TAG ]: [ from, to ] } } );
 					expect( _value ).toEqual( calcExpected( expectedIndexes ) );
 				} );
@@ -622,7 +670,11 @@ describe( 'setValue(...)', () => {
 				beforeAll(() => {
 					_value = createSourceData();
 					onChangeMock = jest.fn();
-					setValue( _value, { testing: { [ MOVE_TAG ]: [ 1, 1 ] } }, onChangeMock );
+					setValue(
+						_value,
+						{ testing: { [ MOVE_TAG ]: [ 1, 1 ] } } as Changes<Value>,
+						onChangeMock
+					);
 				});
 				test( 'creates new entries for non-existent properties', () => {
 					expect( _value ).toEqual({ ...value, testing: [] });
@@ -632,7 +684,7 @@ describe( 'setValue(...)', () => {
 				} );
 			} );
 			test( 'ignores move requests from same index to same index', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				const onChangeMock = jest.fn();
 				setValue( _value, { tags: { [ MOVE_TAG ]: [ 1, 1 ] } }, onChangeMock );
 				expect( _value ).toEqual( value );
@@ -646,7 +698,7 @@ describe( 'setValue(...)', () => {
 				value = createSourceData();
 			});
 			test( 'appends values at the end of value array property', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				setValue( _value, {
 					friends: { [ PUSH_TAG ]: newItems },
 					tags: { [ PUSH_TAG ]: newItems }
@@ -658,17 +710,24 @@ describe( 'setValue(...)', () => {
 				});
 			} );
 			test( 'only updates value slices of the array type', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				setValue( _value, {
 					company: { [ PUSH_TAG ]: newItems }, // non-array `company` value will be ignored
 					friends: { [ PUSH_TAG ]: newItems }
 				} );
-				expect( _value ).toEqual({ ...value, friends: [ ...value.friends, ...newItems ] });
+				expect( _value ).toEqual({
+					...value,
+					friends: [
+						...value.friends,
+						...newItems
+					]
+				});
 			} );
 			describe( 'non-optional argument type validation', () => {
-				test( 'only accepts an array value', () => expect(
-					() => setValue( createSourceData(), { friends: { [ PUSH_TAG ]: [] } } )
-				).not.toThrow( TypeError ) );
+				test( 'only accepts an array value', () => expect(() => {
+					const v : Value = createSourceData();
+					setValue( v, { friends: { [ PUSH_TAG ]: [] } } )
+				}).not.toThrow( TypeError ) );
 				test.each([
 					[ null ], [ undefined ], [ '' ], [ 'test' ], [ {} ],
 					[ { test: expect.anything() } ], [ true ], [ { 0: 2, 1: 1 } ]
@@ -677,7 +736,7 @@ describe( 'setValue(...)', () => {
 				).toThrow( TypeError ) );
 			} );
 			test( 'ignores empty array argument', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				const onChangeMock = jest.fn();
 				setValue( _value, { tags: { [ PUSH_TAG ]: [] } }, onChangeMock );
 				expect( _value ).toEqual( value );
@@ -686,7 +745,11 @@ describe( 'setValue(...)', () => {
 			test( 'creates new entries for non-existent properties', () => {
 				const _value = createSourceData();
 				const onChangeMock = jest.fn();
-				setValue( _value, { testing: { [ PUSH_TAG ]: newItems } }, onChangeMock );
+				setValue(
+					_value,
+					{ testing: { [ PUSH_TAG ]: newItems } } as Changes<Value>,
+					onChangeMock
+				);
 				expect( _value ).toEqual({ ...value, testing: newItems });
 				expect( onChangeMock ).toHaveBeenCalled();
 			} );
@@ -707,11 +770,14 @@ describe( 'setValue(...)', () => {
 					test4: expect.anything(),
 					zone: 33
 				};
-				setValue( _value, { [ REPLACE_TAG ]: valueReplacement } );
+				setValue(
+					_value,
+					{ [ REPLACE_TAG ]: valueReplacement } as Changes<Value>
+				);
 				expect( _value ).toEqual( valueReplacement );
 			});
 			test( 'replaces properties with new value', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				const newValues = {
 					company: 'TEST_COMPANY',
 					friends: 'NEW TEST FRIENDS',
@@ -729,7 +795,7 @@ describe( 'setValue(...)', () => {
 				expect( _value ).toEqual({ ...value, ...newValues });
 			} );
 			test( 'adds new values to property when specified', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				const newValues = {
 					company: 'TEST_COMPANY',
 					friends: 'NEW TEST FRIENDS',
@@ -749,7 +815,7 @@ describe( 'setValue(...)', () => {
 				expect( _value ).toEqual( expected );
 			} );
 			test( 'ignores attempts to replace with identical values', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				const onChangeMock = jest.fn();
 				setValue( _value, {
 					friends: { [ REPLACE_TAG ]: value.friends },
@@ -761,9 +827,11 @@ describe( 'setValue(...)', () => {
 			test( 'adds new properties for attmepts to replace non-existent properties', () => {
 				const _value = createSourceData();
 				const onChangeMock = jest.fn();
-				setValue( _value, {
-					testing: { [ REPLACE_TAG ]: expect.anything() }
-				}, onChangeMock );
+				setValue(
+					_value,
+					{ testing: { [ REPLACE_TAG ]: expect.anything() } } as Changes<Value>,
+					onChangeMock
+				);
 				expect( _value ).toEqual({ ...value, testing: expect.anything() });
 				expect( onChangeMock ).toHaveBeenCalled();
 			} );
@@ -776,10 +844,13 @@ describe( 'setValue(...)', () => {
 			});
 			test( 'replaces value slice with new value', () => {
 				const _value = createSourceData();
-				setValue( _value, {
-					phone: { [ SET_TAG ]: newPhone },
-					tags: [ { [ SET_TAG ]: newTag0 }, ..._value.tags ]
-				} );
+				setValue(
+					_value,
+					{
+						phone: { [ SET_TAG ]: newPhone },
+						tags: [ { [ SET_TAG ]: newTag0 }, ..._value.tags ]
+					} as unknown as Changes<Value>
+				);
 				expect( _value ).toEqual({
 					...value,
 					phone: newPhone,
@@ -794,7 +865,7 @@ describe( 'setValue(...)', () => {
 					expect( _value ).toEqual({ ...value, isActive: newInfo })
 				} );
 				test( 'allows replacing composite value slice with atomic values', () => {
-					const _value = createSourceData();
+					const _value : Value = createSourceData();
 					const phoneNumber = 'TEST PHONE NUMBER';
 					setValue( _value, {	phone: { [ SET_TAG ]: phoneNumber } } );
 					expect( _value ).toEqual({ ...value, phone: phoneNumber })
@@ -871,7 +942,7 @@ describe( 'setValue(...)', () => {
 				} );
 			});
 			test( 'replaces properties with new value', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				const newValues = {
 					company: 'TEST_COMPANY',
 					friends: 'NEW TEST FRIENDS',
@@ -889,7 +960,7 @@ describe( 'setValue(...)', () => {
 				expect( _value ).toEqual({ ...value, ...newValues });
 			} );
 			test( 'adds new values to property when specified', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				const newValues = {
 					company: 'TEST_COMPANY',
 					friends: 'NEW TEST FRIENDS',
@@ -909,7 +980,7 @@ describe( 'setValue(...)', () => {
 				expect( _value ).toEqual( expected );
 			} );
 			test( 'ignores attempts to replace with identical values', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				const onChangeMock = jest.fn();
 				setValue( _value, {
 					friends: { [ SET_TAG ]: value.friends },
@@ -921,9 +992,11 @@ describe( 'setValue(...)', () => {
 			test( 'adds new properties for attmepts to replace non-existent properties', () => {
 				const _value = createSourceData();
 				const onChangeMock = jest.fn();
-				setValue( _value, {
-					testing: { [ SET_TAG ]: expect.anything() }
-				}, onChangeMock );
+				setValue(
+					_value,
+					{ testing: { [ SET_TAG ]: expect.anything() } } as Changes<Value>,
+					onChangeMock
+				);
 				expect( _value ).toEqual({ ...value, testing: expect.anything() });
 				expect( onChangeMock ).toHaveBeenCalled();
 			} );
@@ -947,7 +1020,7 @@ describe( 'setValue(...)', () => {
 				}, []);
 			});
 			test( 'removes a specified number of elements from a specified value array index and inserts new items at that index', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				setValue( _value, {
 					friends: { [ SPLICE_TAG ]: [ 2, 1, ...newItems ] },
 					tags: { [ SPLICE_TAG ]: [ 3, 2, ...newItems ] }
@@ -959,7 +1032,7 @@ describe( 'setValue(...)', () => {
 				});
 			} );
 			test( 'only updates value slices of the array type', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				setValue( _value, {
 					company: { [ SPLICE_TAG ]: [ 0, 2 ] }, // non-array `company` value will be ignored
 					friends: { [ SPLICE_TAG ]: [ 0, 2 ] }
@@ -968,7 +1041,10 @@ describe( 'setValue(...)', () => {
 			} );
 			describe( 'non-optional argument type validation', () => {
 				test( 'only accepts an array value consisting of at least two integers', () => expect(
-					() => setValue( createSourceData(), { friends: { [ SPLICE_TAG ]: [ 0, 1 ] } } )
+					() => {
+						const v : Value = createSourceData();
+						setValue( v, { friends: { [ SPLICE_TAG ]: [ 0, 1 ] } } )
+					}
 				).not.toThrow( TypeError ) );
 				test.each([
 					[ null ], [ undefined ], [ '' ], [ 'test' ], [ {} ], [ { test: expect.anything() } ],
@@ -980,7 +1056,7 @@ describe( 'setValue(...)', () => {
 			} );
 			describe( 'additional optional ...newItems variadic argumemt(s)', () => {
 				test( 'accepts one or more values to insert contiguously starting from the fromIndex position of the value array', () => {
-					const _value = createSourceData();
+					const _value : Value = createSourceData();
 					setValue( _value, {
 						friends: { [ SPLICE_TAG ]: [ 2, 1, ...newItems ] },
 						tags: { [ SPLICE_TAG ]: [ 3, 2, ...newItems ] }
@@ -993,7 +1069,7 @@ describe( 'setValue(...)', () => {
 				} );
 			} );
 			test( 'trims off all leading elements identical to the value array at same index; adjusts fromIndex & deleteCount inserting new items', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				setValue( _value, {
 					friends: { [ SPLICE_TAG ]: [ 0, 3, value.friends[ 0 ], ...newItems ] },
 					tags: { [ SPLICE_TAG ]: [ 2, 4, value.tags[ 2 ], value.tags[ 3 ], ...newItems, value.tags[ 0 ] ] }
@@ -1005,14 +1081,14 @@ describe( 'setValue(...)', () => {
 				});
 			} );
 			test( 'ignores a combination of argument #2 = 0 and no new items to insert', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				const onChangeMock = jest.fn();
 				setValue( _value, { tags: { [ SPLICE_TAG ]: [ 3, 0 ] } }, onChangeMock );
 				expect( _value ).toEqual( value );
 				expect( onChangeMock ).not.toHaveBeenCalled();
 			} );
 			test( 'auto-corrects negative argument #2 to 0', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				const onChangeMock = jest.fn();
 				setValue( _value, { tags: { [ SPLICE_TAG ]: [ 3, -2 ] } }, onChangeMock );
 				expect( _value ).toEqual( value );
@@ -1027,7 +1103,7 @@ describe( 'setValue(...)', () => {
 					[ -2, 1, '', [ 0, 2 ] ],
 					[ -2, 1, ' along with the optional new element to insert', [ 0, 'x', 2 ] ]
 				])( 'accepts negative index in args %d and %d%s', ( from, to, desc, expectedIndices ) => {
-					const _value = createSourceData();
+					const _value : Value = createSourceData();
 					const args = [ from, to ];
 					if( desc.length ) { args.push( ...newItems ) }
 					setValue( _value, { friends: { [ SPLICE_TAG ]: args } } );
@@ -1038,7 +1114,7 @@ describe( 'setValue(...)', () => {
 				} );
 			} );
 			test( 'ignores attempts to remove and re-insert identical values', () => {
-				const _value = createSourceData();
+				const _value : Value = createSourceData();
 				const onChangeMock = jest.fn();
 				setValue( _value, {
 					friends: { [ SPLICE_TAG ]: [ 0, 1, value.friends[ 0 ] ] },
@@ -1050,7 +1126,11 @@ describe( 'setValue(...)', () => {
 			test( 'creates new entries for non-existent properties', () => {
 				const _value = createSourceData();
 				const onChangeMock = jest.fn();
-				setValue( _value, { testing: { [ SPLICE_TAG ]: [ 1, 1 ] } }, onChangeMock );
+				setValue(
+					_value,
+					{ testing: { [ SPLICE_TAG ]: [ 1, 1 ] } } as Changes<Value>,
+					onChangeMock
+				);
 				expect( _value ).toEqual({ ...value, testing: [] });
 				expect( onChangeMock ).toHaveBeenCalled();
 			} );
@@ -1410,7 +1490,7 @@ describe( 'setValue(...)', () => {
 					4: { [ SET_TAG ]: s => `${ s }_${ s.length }` }
 				}
 			};
-			setValue( _value, changes, onChangeMock );
+			setValue( _value, changes as unknown as Changes<Value>, onChangeMock );
 			expect( _value ).toEqual({
 				...value,
 				age: 97,
@@ -1449,17 +1529,17 @@ describe( 'setValue(...)', () => {
 			expect( arg ).toStrictEqual( changes );
 		} );
 		test( `allows '${ REPLACE_TAG } as an alias for '${ SET_TAG }' without the compute function`, () => {
-			const value1 = createSourceData();
-			const value2 = createSourceData();
+			const value1 : Value = createSourceData();
+			const value2 : Value = createSourceData();
 			setValue( value1, { name: { [ REPLACE_TAG ]: { first: 'Jame', last: 'Doe' }, age: 24 } } );
 			setValue( value2, { name: { [ SET_TAG ]: { first: 'Jame', last: 'Doe' }, age: 24 } } );
 			expect( value1 ).toStrictEqual( value2 );
 			expect( value ).not.toEqual( value1 );
 		} );
 		test( `does not allow '${ REPLACE_TAG } as an alias for '${ SET_TAG }' with the compute function`, () => {
-			const value = createSourceData();
-			const value1 = createSourceData();
-			const value2 = createSourceData();
+			const value : Value = createSourceData();
+			const value1 : Value = createSourceData();
+			const value2 : Value = createSourceData();
 			const newBalance = 'TEST_BALANCE';
 			const computeNewBalance = s => newBalance;
 			setValue( value1, { balance: { [ REPLACE_TAG ]: computeNewBalance } } );

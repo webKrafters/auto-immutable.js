@@ -1,4 +1,11 @@
-import type { BaseType, Value, Tag as TagKey, TagCommand, UpdateStats as Stats } from '../../types'; 
+import type {
+	BaseType,
+	KeyType,
+	Tag as TagKey,
+	TagCommand,
+	UpdateStats as Stats,
+	Value
+} from '../../types'; 
 
 type Predicate = (
 	value : Value,
@@ -65,9 +72,13 @@ export const $clear = (() => {
 		finishTagRequest( changes, valueKey, CLEAR_TAG );
 	};
 	const clear : TagFunction = ( value, valueKey, stats, changes ) => {
-		if( !( valueKey in value ) ) { return finishTagRequest( changes, valueKey, CLEAR_TAG ) }
+		if( !( valueKey in value ) ) {
+			return finishTagRequest( changes as Value, valueKey, CLEAR_TAG );
+		}
 		const _value = value[ valueKey ];
-		if( typeof _value === 'undefined' || _value === null ) { return finishTagRequest( changes, valueKey, CLEAR_TAG ) }
+		if( typeof _value === 'undefined' || _value === null ) {
+			return finishTagRequest( changes as Value, valueKey, CLEAR_TAG );
+		}
 		if( isPlainObject( _value ) ) {
 			let hasChanges = false;
 			for( const k in _value ) { // remove properties singularly b/c where value === the setValue `value` argument, we may not change its reference
@@ -75,7 +86,7 @@ export const $clear = (() => {
 				hasChanges = true;
 			}
 			stats.hasChanges = stats.hasChanges || hasChanges;
-			return finishTagRequest( changes, valueKey, CLEAR_TAG );
+			return finishTagRequest( changes as Value, valueKey, CLEAR_TAG );
 		}
 		const type = _value.constructor.name;
 		if( type === 'String' ) { return setDefault( value, valueKey, stats, changes, hasItems, '' ) }
@@ -101,7 +112,7 @@ export const $delete : TagFunction = ( value, valueKey, stats, changes ) => {
 	if( !Array.isArray( deleteKeys ) ) {
 		throw new TypeError( `Invalid entry found at ${ DELETE_TAG } change property: requires an array of value keys to delete.` );
 	}
-	const finish = () => finishTagRequest( changes, valueKey, DELETE_TAG );
+	const finish = () => finishTagRequest( changes as Value, valueKey, DELETE_TAG );
 	let currValue;
 	try{
 		if( !deleteKeys.length ) { throw new Error( 'Delete called with no identified items to delete.' ) };
@@ -166,7 +177,7 @@ export const $move : TagFunction = ( value, valueKey, stats, changes ) => {
 	if( !Array.isArray( args ) || args.length < 2 || !Number.isInteger( args[ 0 ] ) || !Number.isInteger( args[ 1 ] ) ) {
 		throw new TypeError( `Invalid entry found at ${ MOVE_TAG } change property: expecting an array of at least 2 integer values [fromIndex, toIndex, numItems]. numItems is optional. Use negative index to count from array end.` );
 	}
-	const finish = () => finishTagRequest( changes, valueKey, MOVE_TAG );
+	const finish = () => finishTagRequest( changes as Value, valueKey, MOVE_TAG );
 	const _value = value[ valueKey ];
 	if( !Array.isArray( _value ) ) { return finish() }
 	const sLen = _value.length;
@@ -201,11 +212,11 @@ export const $push : TagFunction = ( value, valueKey, stats, changes ) => { // p
 		throw new TypeError( `Invalid entry found at ${ PUSH_TAG } change property: expecting an array of [].pudh(...) compliant argument values.` );
 	}
 	if( !args.length || !Array.isArray( value[ valueKey ] ) ) {
-		return finishTagRequest( changes, valueKey, PUSH_TAG );
+		return finishTagRequest( changes as Value, valueKey, PUSH_TAG );
 	}
 	( value[ valueKey ] as Array<any> ).push( ...args );
 	stats.hasChanges = true;
-	finishTagRequest( changes, valueKey, PUSH_TAG );
+	finishTagRequest( changes as Value, valueKey, PUSH_TAG );
 };
 
 /**
@@ -224,7 +235,7 @@ export const $push : TagFunction = ( value, valueKey, stats, changes ) => { // p
  * $replace(value.nested.items, 4, {hasChanges: false}, {4: {'@@REPLACE': new value, ...}, ...}) // sets `value.nested.items[4]` = new value
  */
 export const $replace : TagFunction = ( value, valueKey, stats, changes ) => {
-	applyReplaceCommand( REPLACE_TAG, value, changes, valueKey, stats );
+	applyReplaceCommand( REPLACE_TAG, value as Value, changes, valueKey, stats );
 };
 
 /**
@@ -249,7 +260,7 @@ export const $set = (() => {
 		if( toString.call( _changes[ valueKey ][ SET_TAG ] ) === '[object Function]' ) {
 			_changes[ valueKey ][ SET_TAG ] = clonedeep( _changes[ valueKey ][ SET_TAG ]( clonedeep( value[ valueKey ] ) ) );
 		}
-		applyReplaceCommand( SET_TAG, value, _changes, valueKey, stats );
+		applyReplaceCommand( SET_TAG, value as Value, _changes, valueKey, stats );
 	};
 	return set;
 })();
@@ -273,7 +284,7 @@ export const $splice : TagFunction = ( value, valueKey, stats, changes ) => {
 	let iLen = items.length;
 	const _value = value[ valueKey ];
 	if( !Array.isArray( _value ) || ( deleteCount < 1 && !iLen ) ) {
-		return finishTagRequest( changes, valueKey, SPLICE_TAG );
+		return finishTagRequest( changes as Value, valueKey, SPLICE_TAG );
 	}
 	if( deleteCount > 0 ) {
 		const sLen = _value.length;
@@ -296,7 +307,7 @@ export const $splice : TagFunction = ( value, valueKey, stats, changes ) => {
 		( value[ valueKey ] as Array<any> ).splice( start, deleteCount, ...items );
 		stats.hasChanges = true;
 	}
-	finishTagRequest( changes, valueKey, SPLICE_TAG );
+	finishTagRequest( changes as Value, valueKey, SPLICE_TAG );
 };
 
 const tagMap = {
@@ -406,7 +417,6 @@ function applyReplaceCommand<T extends Value, TAG extends TagKey>( tag : any, va
 const finishTagRequest = (() => {
 	const end = ( changes, key ) => { delete changes[ key ] };
 	function runCloser( changes : Value, key : keyof Value, tag : TagKey ) : void;
-	function runCloser( changes : Array<any>, key : number, tag : TagKey ) : void;
 	function runCloser( changes : Value, key : string, tag : TagKey ) : void;
 	function runCloser( changes : Value, key : symbol, tag : TagKey ) : void;
 	function runCloser( changes, key, tag ) : void {

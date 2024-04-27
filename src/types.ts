@@ -42,15 +42,13 @@ export type ScalarType = boolean | KeyType;
 export interface Cloneable {
     clone?: ( ...args : Array<any> ) => any;
     cloneNode?: ( ...args : Array<any> ) => any
-}
+};
 
-export interface Value extends Cloneable {
-    [x: KeyType]: ScalarType | Value | Function | {}
-}
+export type Value = Cloneable & {[x: KeyType]: BaseType | Function};
 
 export interface UpdateStats { hasChanges: boolean };
 
-export type BaseType = Array<any> | ScalarType | Value;
+export type BaseType = Array<any> | ScalarType | Value | {} | object;
 
 /** As in {"@@CLEAR":*} is a parameterless command. Parameters have not effect */
 export type ClearCommand = {[CLEAR_TAG]: any};
@@ -75,7 +73,7 @@ export type SpliceCommand = {[SPLICE_TAG]: [number, number, ...Array<any>]}
 
 export type Tag = ClearTag | DeleteTag | MoveTag | PushTag | ReplaceTag | SetTag | SpliceTag;
 
-export type TagCommand<T extends Tag, P extends Value = Value> =
+export type TagCommand<T extends Tag, P extends Value|Array<any> = Value> =
 	T extends ClearTag ? ClearCommand :
 	T extends DeleteTag ? DeleteCommand<P> :
 	T extends MoveTag ? MoveCommand :
@@ -92,9 +90,19 @@ export type Changes<T extends Value> = UpdatePayload<T> | UpdatePayloadArray<T>;
 
 export type Listener = <T extends Value>(changes : Changes<T>) => void;
 
-export type UpdatePayload<T> = T | ClearTag | ClearCommand | DeleteCommand<T> | MoveCommand | PushCommand | ReplaceCommand | SetCommand | SpliceCommand | Value | Partial<{[K in keyof T]: UpdatePayload<T[K]>}>
+export type UpdatePayload<T extends Array<any> | Value> =
+    | ClearTag
+    | TagCommand<Tag, T>
+    | Value
+    | T extends {}
+        ? T | Partial<{
+            [K in keyof T]: T[K] extends Array<any>|Value
+                ? UpdatePayload<T[K]>
+                : UpdatePayload<Value>
+        }>
+        : T;
 
-export type UpdatePayloadArray<T> = Array<UpdatePayload<T>>;
+export type UpdatePayloadArray<T extends Array<any>|Value> = Array<UpdatePayload<T>>;
 
 import Atom from './model/atom';
 

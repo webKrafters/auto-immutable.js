@@ -24,8 +24,6 @@ class AccessorCache <T extends Value>{
 	constructor( origin : T ) {
 		this.#accessors = {};
 		this.#atoms = {};
-		// @debug
-		// this.#origin = clonedeep( origin );
 		this.#origin = origin;
 	}
 

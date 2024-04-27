@@ -1,3 +1,9 @@
+import { Changes } from '../../types';
+
+import type { SourceData } from '../../test-artifacts/data/create-data-obj';
+
+type Value = Partial<SourceData>;
+
 import * as constants from '../../constants';
 import { clonedeep } from '../../utils';
 import AccessorCache from '.';
@@ -8,7 +14,7 @@ import { isReadonly } from '../../test-artifacts/utils';
 const { GLOBAL_SELECTOR } = constants;
 
 describe( 'AccessorCache class', () => {
-	const source = createSourceData();
+	const source : Value = createSourceData();
 	const accessorPaths = [
 		Object.freeze([
 			'friends[1].id',
@@ -114,9 +120,8 @@ describe( 'AccessorCache class', () => {
 			}
 		);
 		test( 'will accept array of update payloads', () => {
-			const source = createSourceData();
+			const source : Value = createSourceData();
 			const cache = new AccessorCache( source );
-			const existingVal = cache.get( CLIENT_ID, 'nullTester', 'tags' );
 			expect(() => {
 				cache.atomize([
 					{ tags: { [ constants.PUSH_TAG ]: [ '_88_' ] } },
@@ -125,20 +130,20 @@ describe( 'AccessorCache class', () => {
 					{ nullTester: undefined },
 					{ tags: { [ constants.SPLICE_TAG ]: [ 4, 1, '_90_' ] } },
 					{ tags: { 2: 'jiveTest' } }
-				]);
-				cache.atomize({ nullTester: null });
+				] as Changes<Value> );
+				cache.atomize({ nullTester: null } as Changes<Value> );
 			}).not.toThrow();
 		} );
 		describe( 'incorporating new data updates', () => {
 			let existingVal, existingValClone, updatedVal;
 			beforeAll(() => {
-				const source = createSourceData();
+				const source : Value = createSourceData();
 				const cache = new AccessorCache( source );
 				const paths = [ ...accessorPaths[ 0 ], 'history', 'history.places[0].year' ];
 				existingVal = cache.get( CLIENT_ID, ...paths );
 				existingValClone = clonedeep( existingVal );
 				newChanges = { history: { places: { 2: { year: '2030' } } } };
-				source.history.places[ 2 ].year = '2030';
+				source.history!.places[ 2 ].year = '2030';
 				cache.atomize( newChanges );
 				updatedVal = cache.get( CLIENT_ID, ...paths );
 			});
@@ -192,13 +197,14 @@ describe( 'AccessorCache class', () => {
 	} );
 	describe( 'unlinkClient(...)', () => {
 		const CLIENT_ID = 'TEST_CLIENT';
-		let atomDisconnectSpy, accessorRemoveClientSpy, cache;
+		let atomDisconnectSpy, accessorRemoveClientSpy;
+		let cache : AccessorCache<Value> | null;
 		beforeAll(() => {
 			const Atom = require( '../atom' ).default;
 			const Accessor = require( '../accessor' ).default;
 			atomDisconnectSpy = jest.spyOn(	Atom.prototype, 'disconnect' );
 			accessorRemoveClientSpy = jest.spyOn(	Accessor.prototype, 'removeClient' );
-			cache = new AccessorCache( createSourceData() );
+			cache = new AccessorCache( createSourceData() as Value );
 			cache.get( CLIENT_ID, 'company' ); // this adds new clients to the structure
 			cache.unlinkClient( CLIENT_ID );
 		});

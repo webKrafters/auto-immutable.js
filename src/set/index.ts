@@ -109,8 +109,8 @@ function isIndexBasedObj( obj : {} ) : boolean {
 
 /** Mutates its arguments */
 function resolveTags(
-	value : Value|Array<any>,
-	changes : Value & Partial<{[K in TagKey]: any}>,
+	value : Value,
+	changes : Changes<Value>,
 	valueKey : KeyType,
 	stats : Stats
 ) : Array<TagKey> {
@@ -123,15 +123,17 @@ function resolveTags(
 		value[ valueKey ] = [];
 	}
 	for( const k in changes[ valueKey ] ) {
-		if( !( valueKey in changes ) ) { break }
+		if( !( valueKey in ( changes as object ) ) ) { break }
 		if( isClosedTag( changes[ valueKey ][ k ] ) ) {
-			changes[ valueKey ][ k ] = { [ changes[ valueKey ][ k ] ]: null };
+			changes[ valueKey ][ k ] = {
+				[ changes[ valueKey ][ k ] ]: null
+			};
 		}
 		if( k in tagFunctions ) {
 			let v = value;
 			/* istanbul ignore else */
 			if( Array.isArray( value ) ) {
-				v = [ ...value ];
+				v = [ ...value ] as unknown as Value;
 			} else if( isPlainObject( value ) ) {
 				v = { ...value };
 			}
