@@ -61,12 +61,11 @@ describe( 'setValue(...)', () => {
 			expect( value.registered?.time ).toStrictEqual( registered.time );
 			[ 'day', 'year' ].forEach( k => {
 				expect( value.registered?.[ k ] ).not.toEqual( registered[ k ] );
-				const _changes = changes as ( typeof changes & { registered: {} } );
-				expect( value.registered?.[ k ] ).toBe( _changes.registered[ k ] );
+				expect( value.registered?.[ k ] ).toBe( changes.registered[ k ] );
 			} );
 			const value2 = createSourceData();
-			const registered2 = clonedeep<typeof value2["registered"]>( value2.registered );
-			const changes2 = clonedeep( changes ) as Changes<typeof value2> & Pick<typeof value2, "registered">;
+			const registered2 = clonedeep( value2.registered );
+			const changes2 = clonedeep( changes );
 			changes2.registered.time.hours = 17; // also add new `hours` value update to `time` object
 			setValue( value2, changes2 );
 			expect( value2.registered.time ).not.toEqual( registered2.time );

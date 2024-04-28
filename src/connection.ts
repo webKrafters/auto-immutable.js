@@ -3,6 +3,10 @@ import type {
     Listener,
     UpdatePayload,
     UpdatePayloadArray,
+	UpdatePayloadArrayCore,
+	UpdatePayloadArrayCoreCloneable,
+	UpdatePayloadCore,
+	UpdatePayloadCoreCloneable,
     Value
 } from './types';
 
@@ -32,16 +36,22 @@ export class Connection<T extends Value> {
         this.#disconnected = true;
     }
     @invoke
-    get( ...propertyPaths : Array<string> ) {
-        return this.#cache.get( this.#id, ...propertyPaths );
-    }
+    get( ...propertyPaths : Array<string> ) { return this.#cache.get( this.#id, ...propertyPaths ) }
+
+    set( changes : UpdatePayload<T>, onComplete? : Listener ) : void;
+	set( changes : UpdatePayloadArray<T>, onComplete? : Listener ) : void;
+	set( changes : UpdatePayloadArrayCore<T>, onComplete? : Listener ) : void;
+	set( changes : UpdatePayloadArrayCoreCloneable<T>, onComplete? : Listener ) : void;
+	set( changes : UpdatePayloadCore<T>, onComplete? : Listener ) : void;
+	set( changes : UpdatePayloadCoreCloneable<T>, onComplete? : Listener ) : void;
+	set( changes : Changes<T>, onComplete? : Listener ) : void;
     @invoke
-    set( changes : Changes<T>, onComplete: Listener = deps.noop ) : void {
+    set( changes : any, onComplete: Listener = deps.noop ) : void {
         deps.setValue(
             this.#cache.origin,
             changes,
             changes => {
-                this.#cache.atomize( changes as UpdatePayload<T> | UpdatePayloadArray<T> );
+                this.#cache.atomize( changes as Changes<T> );
                 onComplete( changes );
             }
         );

@@ -1,4 +1,15 @@
-import type { AccessorPayload, AccessorResponse, Changes, Value } from '../../types';
+import type {
+	AccessorPayload,
+	AccessorResponse,
+	Changes,
+	UpdatePayload,
+	UpdatePayloadArray,
+	UpdatePayloadArrayCore,
+	UpdatePayloadArrayCoreCloneable,
+	UpdatePayloadCore,
+	UpdatePayloadCoreCloneable,
+	Value
+} from '../../types';
 
 interface PropertyOriginInfo {
 	exists: boolean,
@@ -15,7 +26,7 @@ import { getProperty } from '../../utils';
 import Atom from '../atom';
 import Accessor from '../accessor';
 
-class AccessorCache <T extends Value>{
+class AccessorCache<T extends Value> { 
 	#accessors : {[propertyPaths: string]: Accessor};
 	#atoms : AccessorPayload;
 	#origin : T;
@@ -30,7 +41,14 @@ class AccessorCache <T extends Value>{
 	get origin() { return this.#origin }
 
 	/** atomizes value property changes */
-	atomize( originChanges : Changes<T> ) {
+	atomize( originChanges : UpdatePayload<T> ) : void;
+	atomize( originChanges : UpdatePayloadArray<T> ) : void;
+	atomize( originChanges : UpdatePayloadArrayCore<T> ) : void;
+	atomize( originChanges : UpdatePayloadArrayCoreCloneable<T> ) : void;
+	atomize( originChanges : UpdatePayloadCore<T> ) : void;
+	atomize( originChanges : UpdatePayloadCoreCloneable<T> ) : void;
+	atomize( originChanges : Changes<T> ) : void;
+	atomize( originChanges ) : void {
 		const accessors = this.#accessors;
 		const atoms = this.#atoms;
 		const updatedPaths = [];

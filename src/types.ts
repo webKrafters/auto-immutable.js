@@ -1,3 +1,4 @@
+import { ClientRequest, ServerResponse } from 'http';
 import {
     CLEAR_TAG,
     DELETE_TAG,
@@ -10,41 +11,43 @@ import {
     SPLICE_TAG
 } from './constants';
 
-/** @see {@link https://www.npmjs.com/package/@webkrafters/react-observable-context?activeTab=readme#clear-tag-usage} */
+/** @see {@link https://auto-immutable.js.org/api/set/method/tags/clear-usage} */
 export type ClearTag = typeof CLEAR_TAG;
 
-/** @see {@link https://www.npmjs.com/package/@webkrafters/react-observable-context?activeTab=readme#delete-tag-usage} */
+/** @see {@link https://auto-immutable.js.org/api/set/method/tags/delete-usage} */
 export type DeleteTag = typeof DELETE_TAG;
 
 export type GlobalSelector = typeof GLOBAL_SELECTOR;
 
-/** @see {@link https://www.npmjs.com/package/@webkrafters/react-observable-context?activeTab=readme#move-tag-usage} */
+/** @see {@link https://auto-immutable.js.org/api/set/method/tags/move-usage} */
 export type MoveTag = typeof MOVE_TAG;
 
 export type NullSelector = typeof NULL_SELECTOR;
 
-/** @see {@link https://www.npmjs.com/package/@webkrafters/react-observable-context?activeTab=readme#push-tag-usage} */
+/** @see {@link https://auto-immutable.js.org/api/set/method/tags/push-usage} */
 export type PushTag = typeof PUSH_TAG;
 
-/** @see {@link https://www.npmjs.com/package/@webkrafters/react-observable-context?activeTab=readme#replace-tag-usage} */
+/** @see {@link https://auto-immutable.js.org/api/set/method/tags/replace-usage} */
 export type ReplaceTag = typeof REPLACE_TAG;
 
-/** @see {@link https://www.npmjs.com/package/@webkrafters/react-observable-context?activeTab=readme#set-tag-usage} */
+/** @see {@link https://auto-immutable.js.org/api/set/method/tags/set-usage} */
 export type SetTag = typeof SET_TAG;
 
-/** @see {@link https://www.npmjs.com/package/@webkrafters/react-observable-context?activeTab=readme#splice-tag-usage} */
+/** @see {@link https://auto-immutable.js.org/api/set/method/tags/splice-usage} */
 export type SpliceTag = typeof SPLICE_TAG;
 
 export type KeyType = number | string | symbol;
 
 export type ScalarType = boolean | KeyType;
 
-export interface Cloneable {
-    clone?: ( ...args : Array<any> ) => any;
-    cloneNode?: ( ...args : Array<any> ) => any
+export type Cloneable<T extends object> = T & {
+    clone?: ( ...args : Array<any> ) => T;
+    cloneNode?: ( deep : true, ...args : Array<any> ) => T;
 };
 
-export type Value = Cloneable & {[x: KeyType]: BaseType | Function};
+export type ValueObject = {[x: KeyType]: BaseType | Function};
+export type ValueObjectCloneable = Cloneable<ValueObject>;
+export type Value = ValueObject | ValueObjectCloneable;
 
 export interface UpdateStats { hasChanges: boolean };
 
@@ -90,7 +93,7 @@ export type Changes<T extends Value> = UpdatePayload<T> | UpdatePayloadArray<T>;
 
 export type Listener = <T extends Value>(changes : Changes<T>) => void;
 
-export type UpdatePayload<T extends Array<any> | Value> =
+export type UpdatePayloadCore<T extends Array<any> | Value> =
     | ClearTag
     | TagCommand<Tag, T>
     | Value
@@ -101,10 +104,15 @@ export type UpdatePayload<T extends Array<any> | Value> =
                 : UpdatePayload<Value>
         }>
         : T;
+export type UpdatePayloadCoreCloneable<T extends Array<any> | Value> = Cloneable<UpdatePayloadCore<T>>
+export type UpdatePayload<T extends Array<any> | Value> = UpdatePayloadCore<T> | UpdatePayloadCoreCloneable<T>;
 
-export type UpdatePayloadArray<T extends Array<any>|Value> = Array<UpdatePayload<T>>;
+export type UpdatePayloadArrayCore<T extends Array<any>|Value> = Array<UpdatePayload<T>>;
+export type UpdatePayloadArrayCoreCloneable<T extends Array<any>|Value> = Cloneable<UpdatePayloadArrayCore<T>>;
+export type UpdatePayloadArray<T extends Array<any> | Value> = UpdatePayloadArrayCore<T>|UpdatePayloadArrayCoreCloneable<T>;
 
 import Atom from './model/atom';
+import { Http2ServerResponse } from 'http2';
 
 export { Connection } from './connection';
 

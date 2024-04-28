@@ -1,5 +1,3 @@
-import { Changes } from '../../types';
-
 import type { SourceData } from '../../test-artifacts/data/create-data-obj';
 
 type Value = Partial<SourceData>;
@@ -120,7 +118,7 @@ describe( 'AccessorCache class', () => {
 			}
 		);
 		test( 'will accept array of update payloads', () => {
-			const source : Value = createSourceData();
+			const source = createSourceData() as Value & { nullTester?; unknown };
 			const cache = new AccessorCache( source );
 			expect(() => {
 				cache.atomize([
@@ -130,8 +128,8 @@ describe( 'AccessorCache class', () => {
 					{ nullTester: undefined },
 					{ tags: { [ constants.SPLICE_TAG ]: [ 4, 1, '_90_' ] } },
 					{ tags: { 2: 'jiveTest' } }
-				] as Changes<Value> );
-				cache.atomize({ nullTester: null } as Changes<Value> );
+				] );
+				cache.atomize({ nullTester: null });
 			}).not.toThrow();
 		} );
 		describe( 'incorporating new data updates', () => {
