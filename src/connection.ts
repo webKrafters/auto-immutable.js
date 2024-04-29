@@ -7,36 +7,71 @@ import type {
 	UpdatePayloadArrayCoreCloneable,
 	UpdatePayloadCore,
 	UpdatePayloadCoreCloneable,
-    Value
+    Value,
+    ValueObject,
+    ValueObjectCloneable
 } from './types';
 
 import setValue from './set';
+
+import { Immutable } from '.';
 
 import AccessorCache from './model/accessor-cache';
 
 export const deps = { noop: () => {}, setValue }
 
+export interface Source<T extends Value> {
+    key: Immutable<T>,
+    map: WeakMap<Immutable<T>, AccessorCache<T>>
+}
+
 export class Connection<T extends Value> {
-    #cache : AccessorCache<T>;
-    #disconnected = false;
+
+    #endSourceWatch : () => void;
     #id : string;
-    constructor(
-        id : string,
-        cache : AccessorCache<T>
-    ) {
+    #source : Source<T>
+
+    constructor( id : string, source: Source<Value> );
+    constructor( id : string, source: Source<ValueObject> );
+    constructor( id : string, source: Source<ValueObjectCloneable> );
+    constructor( id : string, source: Source<T> ){
         this.#id = id;
-        this.#cache = cache;
+        this.#source = source;
+        this.#endSourceWatch = this.#source.key.onClose(
+            () => this.disconnect()
+        );
     }
-    get disconnected() { return this.#disconnected }
+
+    get disconnected() {
+        if( this.#source ) {
+            if( this.#source?.map.get( this.#source.key ) instanceof AccessorCache ) {
+                return false;
+            }
+            // addresses eventual gc collection of source immutable when not
+            // properly disposed. (i.e. w/o calling Immutable.close(...) prior)
+            // istanbul ignore next
+            this.#source = undefined;
+        }
+        return true;
+    }
     get instanceId() { return this.#id }
+
     @invoke
     disconnect() {
-        this.#cache.unlinkClient( this.#id );
-        this.#cache = undefined;
-        this.#disconnected = true;
+        this.#source.map
+            .get( this.#source.key )
+            .unlinkClient( this.#id );
+        this.#endSourceWatch();
+        this.#endSourceWatch = undefined;
+        this.#source = undefined;
     }
+
     @invoke
-    get( ...propertyPaths : Array<string> ) { return this.#cache.get( this.#id, ...propertyPaths ) }
+    get( ...propertyPaths : Array<string> ) {
+        return this.#source.map
+            .get( this.#source.key )
+            .get( this.#id, ...propertyPaths );
+    }
 
     set( changes : UpdatePayload<T>, onComplete? : Listener ) : void;
 	set( changes : UpdatePayloadArray<T>, onComplete? : Listener ) : void;
@@ -48,14 +83,21 @@ export class Connection<T extends Value> {
     @invoke
     set( changes : any, onComplete: Listener = deps.noop ) : void {
         deps.setValue(
-            this.#cache.origin,
+            this.#source.map.get( this.#source.key ).origin,
             changes,
             changes => {
-                this.#cache.atomize( changes as Changes<T> );
+                // addresses eventual gc collection when not properly
+                // disposed. (i.e. w/o calling this.disconnect(...) prior)
+                // istanbul ignore next
+                if( this.disconnected ) { return }
+                this.#source.map
+                    .get( this.#source.key )
+                    .atomize( changes as Changes<T> );
                 onComplete( changes );
             }
         );
     }
+
 }
 
 function invoke<C>( method: Function, context: C ) {

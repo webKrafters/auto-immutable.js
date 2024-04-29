@@ -1,4 +1,3 @@
-import { ClientRequest, ServerResponse } from 'http';
 import {
     CLEAR_TAG,
     DELETE_TAG,
@@ -87,7 +86,7 @@ export type TagCommand<T extends Tag, P extends Value|Array<any> = Value> =
 
 export interface AccessorPayload {[ propertyPath: string ]: Atom};
 
-export interface AccessorResponse {[ propertyPaths: string ]: Readonly<any>};
+export interface AccessorResponse {[ propertyPath: string ]: Atom["value"]}; // [Readonly<any>};
 
 export type Changes<T extends Value> = UpdatePayload<T> | UpdatePayloadArray<T>;
 
@@ -112,8 +111,9 @@ export type UpdatePayloadArrayCoreCloneable<T extends Array<any>|Value> = Clonea
 export type UpdatePayloadArray<T extends Array<any> | Value> = UpdatePayloadArrayCore<T>|UpdatePayloadArrayCoreCloneable<T>;
 
 import Atom from './model/atom';
-import { Http2ServerResponse } from 'http2';
 
 export { Connection } from './connection';
 
-export { Immutable } from '.';
+export {
+    Closable,
+    Immutable} from '.';

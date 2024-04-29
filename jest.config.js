@@ -6,22 +6,24 @@ module.exports = {
         '<rootDir>/src/types.ts',
     ],
     detectOpenHandles: true,
-    globals: {
-        'ts-jest': {
-            diagnostics: {
-                ignoreCodes: [
-                    2322,
-                    2353,
-                    2571,
-                    2741,
-                    2769,
-                    6031,
-                    18003
-                ]
-            }
-        }
-    },
+    globals: {},
     preset: 'ts-jest',
     testEnvironment: 'node',
-    // transform: { '\\.tsx?$': 'ts-jest' }
+    transform: {
+        '\\.tsx?$': [
+            'ts-jest', {
+                diagnostics: {
+                    ignoreCodes: [
+                        2322,
+                        2353,
+                        2571,
+                        2741,
+                        2769,
+                        6031,
+                        18003
+                    ]
+                }
+            }
+        ]
+    }
 };

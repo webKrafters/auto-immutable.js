@@ -12,13 +12,12 @@ const isFunction = (() => {
  * An atom represents an entry for each individual property\
  * path of the value still in use by client components
  */
-class Atom<T = any> {
-	/** @type {Set<number>} */
-	#connections;
-	/** @type {Readonly<T>} */
-	#value;
+class Atom<T = unknown> {
+	#connections : Set<number>;
+	#value : Readonly<T>;
 
-	/** @param {T|Readonly<T>} [value] */
+	constructor( value? : T );
+	constructor( value? : Readonly<T> );
 	constructor( value = undefined ) {
 		this.#connections = new Set();
 		this.setValue( value );
@@ -26,29 +25,25 @@ class Atom<T = any> {
 
 	get value() { return this.#value }
 
-	/**
-	 * @param {number} accessorId
-	 * @returns {number} Number of connections remaining
-	 */
-	connect( accessorId ) {
+	/** @returns {number} Number of connections remaining */
+	connect( accessorId : number ) : number {
 		this.#connections.add( accessorId );
 		return this.#connections.size;
 	}
 
-	/**
-	 * @param {number} accessorId
-	 * @returns {number} Number of connections remaining
-	 */
-	disconnect( accessorId ) {
+	/** @returns {number} Number of connections remaining */
+	disconnect( accessorId : number ) : number {
 		this.#connections.delete( accessorId );
 		return this.#connections.size;
 	}
 
-	/** @param {number} accessorId */
-	isConnected( accessorId ) { return this.#connections.has( accessorId ) }
+	isConnected( accessorId : number ) : boolean {
+		return this.#connections.has( accessorId );
+	}
 
-	/** @param {T|Readonly<T>} newValue */
-	setValue( newValue ) {
+	setValue( newValue : Readonly<T> ) : void;
+	setValue( newValue : T ) : void;
+	setValue( newValue ) : void {
 		this.#value = !isFunction( newValue )
 			? makeReadonly( clonedeep( newValue ) )
 			: newValue;

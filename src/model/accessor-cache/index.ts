@@ -26,7 +26,7 @@ import { getProperty } from '../../utils';
 import Atom from '../atom';
 import Accessor from '../accessor';
 
-class AccessorCache<T extends Value> { 
+class AccessorCache<T extends Value> {
 	#accessors : {[propertyPaths: string]: Accessor};
 	#atoms : AccessorPayload;
 	#origin : T;

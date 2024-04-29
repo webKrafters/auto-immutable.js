@@ -1,104 +1,147 @@
-import AccessorCache from "./model/accessor-cache";
-import { deps, Connection } from "./connection";
+import AccessorCache from './model/accessor-cache';
+import { Immutable } from '.';
+import { deps, Connection } from './connection';
 
-describe( 'Connection class', () => {
-    let iCacheGetSpy, iCacheUnlinkSpy;
-    beforeAll(() => {
-        iCacheGetSpy = jest
-            .spyOn( AccessorCache.prototype, 'get' )
-            .mockReturnValue({});
-        iCacheUnlinkSpy = jest
-            .spyOn( AccessorCache.prototype, 'unlinkClient' )
-            .mockReturnValue( undefined );
-    });
-    beforeEach(() => {
-        iCacheGetSpy.mockClear();
-        iCacheUnlinkSpy.mockClear();
-    });
-    afterAll(() => {
-        iCacheGetSpy.mockRestore();
-        iCacheUnlinkSpy.mockRestore();
-    });
+describe( 'Connection class', () => { 
+    const setup = () => {
+        const cache = new AccessorCache({});
+        const imDeps = require( '.' ).deps;
+        const  assignCacheOrig = imDeps.assignCache;
+        imDeps.assignCache = () => cache;
+        const expectedId = 'TEST ID';
+        const key = new Immutable({});
+        const map = new WeakMap();
+        map.set( key, imDeps.assignCache() );
+        const cn = new Connection( expectedId, { key, map } );
+        const teardown = () => {
+            imDeps.assignCache = assignCacheOrig;
+        }
+        return { cache, connection: cn, expectedId, key, map, teardown };
+    };
     test( 'constructs an immutable connection instance', () => {
-        const expectedId = expect.any( String );
-        const cn = new Connection(
-            expectedId,
-            expect.any( AccessorCache )
-        );
-        expect( cn.instanceId ).toBe( expectedId );
-        expect( cn.disconnected ).toBe( false );
+        const { connection, expectedId, teardown } = setup();
+        expect( connection ).toBeInstanceOf( Connection );
+        expect( connection.instanceId ).toBe( expectedId );
+        expect( connection.disconnected ).toBe( false );
+        teardown();
     } );
-    test(
-        'gets from cache value(s) located at properyPath(s)',
-        () => {
-            const expectedId = expect.any( String );
-            const cn = new Connection(
-                expectedId,
-                new AccessorCache({})
-            );
-            const popertyPaths = [ '1', '2', '3', '4' ];
-            cn.get( ...popertyPaths );
-            expect( iCacheGetSpy ).toHaveBeenCalledTimes( 1 );
-            expect( iCacheGetSpy ).toHaveBeenCalledWith( expectedId, ...popertyPaths );
-        }
-    );
-    test(
-        'updates the cache data with new changes',
-        () => {
-            const expectedId = expect.any( 'TEST_ID' );
-            const expectedSourceData = expect.any( Object );
-            const origSetter = deps.setValue;
-            deps.setValue = jest.fn();
-            const updateCompleteListener = expect.any( Function );
-            const changes = expect.any( Object );
-            const cn = new Connection(
-                expectedId,
-                new AccessorCache( expectedSourceData )
-            );
-            cn.set( changes, updateCompleteListener );
-            expect( deps.setValue ).toHaveBeenCalledTimes( 1 );
-            expect( deps.setValue ).toHaveBeenCalledWith(
-                expectedSourceData,
-                changes,
-                updateCompleteListener
-            );
-            deps.setValue = origSetter;
-        }
-    );
+    describe( '', () => {
+        let passedFoundTest, passedNoneFoundTest, passedUpdateCompleteNotifiedTest;
+        let updateTest : {[x:string]:any} = {};
+        beforeAll(() => {
+            const { cache, connection, teardown } = setup();
+
+            const propertyPaths = [ 'valid', 'b.message' ];
+            
+            let d = connection.get( ...propertyPaths );
+            passedNoneFoundTest =
+            Object.keys( d ).length === 2
+                && d[ 'b.message' ] === undefined
+                && d.valid === undefined;
+
+            const protectedData = {
+                a: 333,
+                b: {
+                    message: 'Doing consumer testing...'
+                },
+                valid: true
+            };
+
+            const prevCacheOrigin = { ...cache.origin };
+
+            const setCallback = jest.fn();
+            connection.set( protectedData, setCallback );
+
+            updateTest.prevCacheOrigin = prevCacheOrigin;
+            updateTest.cacheOrigin = cache.origin;
+            updateTest.data = protectedData;
+            
+            const setCallbackCalls = setCallback.mock.calls;
+            passedUpdateCompleteNotifiedTest =
+                setCallbackCalls.length === 1 && 
+                setCallbackCalls[ 0 ][ 0 ] === protectedData;
+
+            const v = connection.get( ...propertyPaths );
+
+            passedFoundTest =
+                Object.keys( v ).length === 2
+                && v[ 'b.message' ] === protectedData.b.message
+                && v.valid === protectedData.valid;
+
+           teardown();
+        } );
+        test(
+            'gets from cache value(s) located at properyPath(s)',
+            () => { expect( passedFoundTest ).toBe( true ) }
+        );
+        test(
+            'defaults to `undefined` for property paths not found',
+            () => { expect( passedNoneFoundTest ).toBe( true ) }
+        );
+        test( 'updates the cache data with new changes', () => {
+            expect( updateTest.cacheOrigin ).not.toEqual( updateTest.prevCacheOrigin );
+            expect( updateTest.cacheOrigin ).toEqual( updateTest.data );
+        } );
+        test(
+            'calls any post update callback with the `changes` payload',
+            () => { expect( passedUpdateCompleteNotifiedTest ).toBe( true ) }
+        );
+    } );
     describe( 'disconnection', () => {
         test(
             'discards internally held refs and sets `disconnected` flag',
             () => {
-                const origSetter = deps.setValue;
-                deps.setValue = jest.fn();
-                const cn = new Connection(
-                    expect.any( String ),
-                    new AccessorCache( expect.any( Object ) )
-                )
-                cn.disconnect();
-                expect( cn.disconnected ).toBe( true );
-                cn.get( expect.any( Array ) );
-                expect( iCacheGetSpy ).not.toHaveBeenCalled();
-                cn.set( {}, jest.fn() );
-                expect( deps.setValue ).not.toHaveBeenCalled();
-                deps.setValue = origSetter;
+                const { cache, connection, teardown } = setup();
+
+                const cacheGetSpy = jest
+                    .spyOn( cache, 'get' )
+                    .mockReturnValue({});
+                const setSpy = jest
+                    .spyOn( deps, 'setValue' )
+                    .mockReturnValue( undefined );
+
+                connection.get( expect.any( Array ) );
+                expect( cacheGetSpy ).toHaveBeenCalledTimes( 1 );
+                connection.set( {} );
+                expect( setSpy ).toHaveBeenCalledTimes( 1 );
+
+                cacheGetSpy.mockClear();                
+                setSpy.mockClear();
+
+                connection.disconnect();
+
+                expect( connection.disconnected ).toBe( true );
+                connection.get( expect.any( Array ) );
+                expect( cacheGetSpy ).not.toHaveBeenCalled();
+                connection.set( {} );
+                expect( setSpy ).not.toHaveBeenCalled();
+
+                jest.restoreAllMocks();
+        
+                teardown();
             }
         );
         test(
             'once disconnected ignores further disconnection requests',
             () => {
-                const cn = new Connection(
-                    expect.any( String ),
-                    new AccessorCache( expect.any( String ) )
-                )
-                cn.disconnect();
-                expect( iCacheUnlinkSpy ).toHaveBeenCalledTimes( 1 );
-                iCacheUnlinkSpy.mockClear();
-                cn.disconnect();
-                expect( iCacheUnlinkSpy ).not.toHaveBeenCalled();
-                iCacheUnlinkSpy.mockClear();
-                cn.disconnect();
-                expect( iCacheUnlinkSpy ).not.toHaveBeenCalled();
+                const { cache, connection, teardown } = setup();
+
+                const cacheUnlinkSpy = jest
+                    .spyOn( cache, 'unlinkClient' )
+                    .mockReturnValue( undefined );
+
+                connection.disconnect();
+                expect( cacheUnlinkSpy ).toHaveBeenCalledTimes( 1 );
+                cacheUnlinkSpy.mockClear();
+                connection.disconnect();
+                expect( cacheUnlinkSpy ).not.toHaveBeenCalled();
+                cacheUnlinkSpy.mockClear();
+                connection.disconnect();
+                expect( cacheUnlinkSpy ).not.toHaveBeenCalled();
+
+                cacheUnlinkSpy.mockRestore();
+        
+                teardown();
             }
         );
     } );
