@@ -12,7 +12,7 @@
 
 **[Auto Immutable](https://auto-immutable.js.org/api/#source)** is a self enforcing immutable class. Its internal data are private and readonly.
 
-It provides [Consumer](https://auto-immutable.js.org/api/#consumer) instances from which it can be used.
+It provides [Consumer](https://auto-immutable.js.org/api/#consumer) instances through which it can be read and updated.
 
 ### Name:
 
