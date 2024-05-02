@@ -1,27 +1,26 @@
 # Auto Immutable JS
 
-<p align="center" height="20" width="20" padding="20">
-    <img src="docs/src/images/logo.svg" height="240" width="640"
-    i-style="border:1px solid #ffffff" --
+<p>
+    <img
+        height="240"
+        src="docs/src/images/logo.svg" 
+        width="640"
     ></img>
 </p>
 
 # Introduction
-**Auto Immutable** is a self enforcing immutable class. Its internal data are private and readonly.
-<ul>
-    <li>
-        It can only ever be <strong>updated</strong> by its <strong><code>set(...)</code></strong> method.
-    </li>
-    <li>
-        It can only ever be <strong>read</strong> by its <strong><code>get(...)</code></strong> method.
-    </li>
-</ul>
+
+**[Auto Immutable](https://auto-immutable.js.org/api/#source)** is a self enforcing immutable class. Its internal data are private and readonly.
+
+It provides [Consumer](https://auto-immutable.js.org/api/#consumer) instances from which it can be used.
 
 ### Name:
+
 <strong>@webkrafters/auto-immutable</strong><br />
 <strong>Alternate:</strong> auto-immutable.js
 
 # Installation
+
 npm install --save @webkrafters/auto-immutable
 
 # Quick Start
