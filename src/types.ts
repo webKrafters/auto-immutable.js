@@ -70,7 +70,7 @@ export type ReplaceCommand = {[REPLACE_TAG]: BaseType}
 /** As in {"@@SET": Replacement value} */
 export type SetCommand = {[SET_TAG]: BaseType | (<V>(currentValue: V) => any)}
 
-/** As in {"@@SPLICE": [-/+fromIndex, +deleteCount, ...newItems? ]}. numItems = undefined by default. */
+/** As in {"@@SPLICE": [-/+fromIndex, +deleteCount <n >= 0>, ...newItems? ]}. numItems = undefined by default. */
 export type SpliceCommand = {[SPLICE_TAG]: [number, number, ...Array<any>]}
 
 export type Tag = ClearTag | DeleteTag | MoveTag | PushTag | ReplaceTag | SetTag | SpliceTag;

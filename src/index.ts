@@ -69,6 +69,11 @@ export class Immutable<T extends Value = Value> extends Closable {
         deps.numCreated++;
     }
 
+    close() {
+        super.close();
+        Immutable.#cacheMap.delete( this );
+    }
+
     @invoke
     connect() {
         return new Connection(
