@@ -1,8 +1,8 @@
 {
-  "alias": "long-count",
+  "alias": "auto-immutable",
   "author": "Stephen Isienyi <stephen.isienyi@webkrafting.com>",
   "bugs": {
-    "url": "https://github.com/webKrafters/long-count/issues"
+    "url": "https://github.com/webKrafters/auto-immutable/issues"
   },
   "contributors": [
     "steveswork <stephen.isienyi@gmail.com> (https://github.com/steveswork)"
@@ -10,7 +10,7 @@
   "dependencies": {
     "@webkrafters/get-property": "^1.1.2"
   },
-  "description": "Long Count - intervals and timeout capable of handling superbly long wait times surviving device sleep and wake cycles.",
+  "description": "Auto Immutable - self enforcing immutable data structure",
   "devDependencies": {
     "@babel/cli": "^7.17.0",
     "@babel/core": "^7.20.5",
@@ -31,9 +31,9 @@
   "files": [
     "dist",
     "index.js",
-    "logo.svg"
+    "docs/src/images/logo.svg"
   ],
-  "homepage": "https://github.com/webKrafters/long-count/readme",
+  "homepage": "https://github.com/webKrafters/auto-immutable/readme",
   "keywords": [
     "auto-immutable",
     "immutable",
@@ -41,13 +41,13 @@
   ],
   "license": "MIT",
   "main": "index.js",
-  "name": "@webkrafters/long-count",
+  "name": "@webkrafters/auto-immutable",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/webKrafters/long-count.git"
+    "url": "git+https://github.com/webKrafters/auto-immutable.git"
   },
   "scripts": {
     "build": "rm -rf dist && tsc && babel dist -d dist",
