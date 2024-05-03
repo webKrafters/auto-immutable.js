@@ -8,7 +8,10 @@
     "steveswork <stephen.isienyi@gmail.com> (https://github.com/steveswork)"
   ],
   "dependencies": {
-    "@webkrafters/get-property": "^1.1.2"
+    "@webkrafters/get-property": "^1.1.2",
+    "lodash.isempty": "^4.4.0",
+    "lodash.isequal": "^4.5.0",
+    "lodash.isplainobject": "^4.0.6"
   },
   "description": "Auto Immutable - self enforcing immutable data structure",
   "devDependencies": {

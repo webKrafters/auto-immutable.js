@@ -1,9 +1,0 @@
-export declare const CLEAR_TAG = "@@CLEAR";
-export declare const DELETE_TAG = "@@DELETE";
-export declare const GLOBAL_SELECTOR = "@@GLOBAL";
-export declare const MOVE_TAG = "@@MOVE";
-export declare const NULL_SELECTOR = "";
-export declare const PUSH_TAG = "@@PUSH";
-export declare const REPLACE_TAG = "@@REPLACE";
-export declare const SET_TAG = "@@SET";
-export declare const SPLICE_TAG = "@@SPLICE";
