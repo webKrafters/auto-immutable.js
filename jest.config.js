@@ -3,7 +3,7 @@ module.exports = {
     coveragePathIgnorePatterns: [
         '<rootDir>/src/\\$global.ts',
         '<rootDir>/src/test-artifacts',
-        '<rootDir>/src/types.ts',
+        '<rootDir>/src/index.ts'
     ],
     detectOpenHandles: true,
     globals: {},

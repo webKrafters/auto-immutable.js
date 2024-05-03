@@ -1,4 +1,4 @@
-import type { Changes } from '../types';
+import type { Changes } from '..';
 
 import type { SourceData } from '../test-artifacts/data/create-data-obj';
 

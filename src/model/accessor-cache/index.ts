@@ -9,7 +9,7 @@ import type {
 	UpdatePayloadCore,
 	UpdatePayloadCoreCloneable,
 	Value
-} from '../../types';
+} from '../..';
 
 interface PropertyOriginInfo {
 	exists: boolean,

@@ -1,95 +1,135 @@
-type Fn = (...args: any[]) => any;
-type Constants = typeof constants;
-type TagKeys = {[K in keyof Constants]: K extends `${ string }_TAG` ? K : never}[ keyof Constants ];
-type TagNameMap = {[K in TagKeys]: K extends `${ infer P }_TAG` ? P : never}
-type TagType = {[K in TagKeys as TagNameMap[ K ]]: Constants[ K ] };
+import type { Closable, TagType } from './main';
 
-import type { Value } from './types';
+import {
+    CLEAR_TAG,
+    DELETE_TAG,
+    GLOBAL_SELECTOR,
+    MOVE_TAG,
+    NULL_SELECTOR,
+    PUSH_TAG,
+    REPLACE_TAG,
+    SET_TAG,
+    SPLICE_TAG
+} from './constants';
 
-import * as _constants from './constants';
+import { Immutable, Tag } from './main';
 
-import { clonedeep } from './utils';
+/** @see {@link https://auto-immutable.js.org/api/set/method/tags/clear-usage} */
+export type ClearTag = typeof CLEAR_TAG;
 
-import AccessorCache from './model/accessor-cache';
+/** @see {@link https://auto-immutable.js.org/api/set/method/tags/delete-usage} */
+export type DeleteTag = typeof DELETE_TAG;
 
-import { Connection } from './connection';
+export type GlobalSelector = typeof GLOBAL_SELECTOR;
 
-export const constants = _constants;
+/** @see {@link https://auto-immutable.js.org/api/set/method/tags/move-usage} */
+export type MoveTag = typeof MOVE_TAG;
 
-export const Tag = {} as Readonly<TagType>;
-for( let k in constants ) {
-    if( !k.endsWith( '-TAG' ) ) { continue }
-    // istanbul ignore next
-    Tag[ k.slice( 0, -4 ) ] = constants[ k ];
+export type NullSelector = typeof NULL_SELECTOR;
+
+/** @see {@link https://auto-immutable.js.org/api/set/method/tags/push-usage} */
+export type PushTag = typeof PUSH_TAG;
+
+/** @see {@link https://auto-immutable.js.org/api/set/method/tags/replace-usage} */
+export type ReplaceTag = typeof REPLACE_TAG;
+
+/** @see {@link https://auto-immutable.js.org/api/set/method/tags/set-usage} */
+export type SetTag = typeof SET_TAG;
+
+/** @see {@link https://auto-immutable.js.org/api/set/method/tags/splice-usage} */
+export type SpliceTag = typeof SPLICE_TAG;
+
+export type KeyType = number | string | symbol;
+
+export type ScalarType = boolean | KeyType;
+
+export type Cloneable<T extends object> = T & {
+    clone?: ( ...args : Array<any> ) => T;
+    cloneNode?: ( deep : true, ...args : Array<any> ) => T;
 };
-Object.freeze( Tag );
 
-export const deps = {
-    assignCache: <T extends Value>( initValue : T ) => new AccessorCache( clonedeep( initValue ) ),
-    numCreated: 0
+export type ValueObject = {[x: KeyType]: BaseType | Function};
+export type ValueObjectCloneable = Cloneable<ValueObject>;
+export type Value = ValueObject | ValueObjectCloneable;
+
+export interface UpdateStats { hasChanges: boolean };
+
+export type BaseType = Array<any> | ScalarType | Value | {} | object;
+
+/** As in {"@@CLEAR":*} is a parameterless command. Parameters have not effect */
+export type ClearCommand = {[CLEAR_TAG]: any};
+
+/** As in {"@@DELETE": [property keys to delete]} */
+export type DeleteCommand<T> = {[DELETE_TAG]: Array<keyof T>}
+
+/** As in {"@@MOVE": [-/+fromIndex, -/+toIndex, +numItems? ]}. numItems = 1 by default. */
+export type MoveCommand = {[MOVE_TAG]: [number, number, number?]}
+
+/** As in {"@@PUSH": [new items]} */
+export type PushCommand = {[PUSH_TAG]: Array<any>}
+
+/** As in {"@@REPLACE": Replacement value} */
+export type ReplaceCommand = {[REPLACE_TAG]: BaseType}
+
+/** As in {"@@SET": Replacement value} */
+export type SetCommand = {[SET_TAG]: BaseType | (<V>(currentValue: V) => any)}
+
+/** As in {"@@SPLICE": [-/+fromIndex, +deleteCount <n >= 0>, ...newItems? ]}. numItems = undefined by default. */
+export type SpliceCommand = {[SPLICE_TAG]: [number, number, ...Array<any>]}
+
+export type TagCommand<T extends TagType, P extends Value|Array<any> = Value> =
+	T extends ClearTag ? ClearCommand :
+	T extends DeleteTag ? DeleteCommand<P> :
+	T extends MoveTag ? MoveCommand :
+	T extends PushTag ? PushCommand :
+	T extends ReplaceTag ? ReplaceCommand :
+	T extends SetTag ? SetCommand :
+	T extends SpliceTag ? SpliceCommand : never;
+
+export interface AccessorPayload {[ propertyPath: string ]: Atom};
+
+export interface AccessorResponse {[ propertyPath: string ]: Atom["value"]}; // [Readonly<any>};
+
+export type Changes<T extends Value> = UpdatePayload<T> | UpdatePayloadArray<T>;
+
+export type Listener = <T extends Value>(changes : Changes<T>) => void;
+
+export type UpdatePayloadCore<T extends Array<any> | Value> =
+    | ClearTag
+    | TagCommand<TagType, T>
+    | Value
+    | T extends {}
+        ? T | Partial<{
+            [K in keyof T]: T[K] extends Array<any>|Value
+                ? UpdatePayload<T[K]>
+                : UpdatePayload<Value>
+        }>
+        : T;
+export type UpdatePayloadCoreCloneable<T extends Array<any> | Value> = Cloneable<UpdatePayloadCore<T>>
+export type UpdatePayload<T extends Array<any> | Value> = UpdatePayloadCore<T> | UpdatePayloadCoreCloneable<T>;
+
+export type UpdatePayloadArrayCore<T extends Array<any>|Value> = Array<UpdatePayload<T>>;
+export type UpdatePayloadArrayCoreCloneable<T extends Array<any>|Value> = Cloneable<UpdatePayloadArrayCore<T>>;
+export type UpdatePayloadArray<T extends Array<any> | Value> = UpdatePayloadArrayCore<T>|UpdatePayloadArrayCoreCloneable<T>;
+
+import type Atom from './model/atom';
+
+export type { Connection } from './connection';
+
+export type { Closable, TagType };
+
+export { Immutable, Tag };
+
+export {
+    CLEAR_TAG,
+    DELETE_TAG,
+    GLOBAL_SELECTOR,
+    MOVE_TAG,
+    NULL_SELECTOR,
+    PUSH_TAG,
+    REPLACE_TAG,
+    SET_TAG,
+    SPLICE_TAG
 };
 
-export class Closable {
-    
-    #closed = false;
-    #listeners = new Set<Fn>();
-
-    get closed() { return this.#closed }
-
-    @invoke
-    close() {
-        this.#listeners.forEach( f => f() )
-        this.#closed = true;
-    }
-
-    @invoke
-    onClose( fn : Fn ) {
-        const _fn = () => {
-            fn();
-            this.#offClose( _fn );
-        }
-        this.#listeners.add( _fn );
-        return () => this.#offClose( _fn );
-    }
-
-    @invoke
-    #offClose( fn : Fn ) { this.#listeners.delete( fn ) }
-
-}
-
-export class Immutable<T extends Value = Value> extends Closable {
-    
-    static #cacheMap = new WeakMap<Immutable<Value>, AccessorCache<Value>>(); 
-    
-    #numConnectionsCreated = 0;
-    
-    constructor( initValue : T ) {
-        super();
-        Immutable.#cacheMap.set( this, deps.assignCache( initValue ) );
-        deps.numCreated++;
-    }
-
-    close() {
-        super.close();
-        Immutable.#cacheMap.delete( this );
-    }
-
-    @invoke
-    connect() {
-        return new Connection(
-            `${ deps.numCreated }:${ ++this.#numConnectionsCreated }`, {
-                key: this,
-                map: Immutable.#cacheMap
-            }
-        );
-    }
-}
-
-function invoke<C>( method: Function, context: C ) {
-    return function (
-        this: Closable,
-        ...args: Array<any>
-    ) {
-        if( this.closed ) { return }
-        return method.apply( this, args ) };
-}
+export default Immutable;
