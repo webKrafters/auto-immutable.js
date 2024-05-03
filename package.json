@@ -31,7 +31,7 @@
   "files": [
     "dist",
     "index.js",
-    "docs/src/images/logo.svg"
+    "logo.svg"
   ],
   "homepage": "https://github.com/webKrafters/auto-immutable/readme",
   "keywords": [
@@ -51,6 +51,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc && babel dist -d dist",
+    "postbuild": "node post-build.js",
     "test": "jest --coverage --updateSnapshot",
     "test:clean": "jest --clearCache",
     "test:core": "jest --updateSnapshot",
