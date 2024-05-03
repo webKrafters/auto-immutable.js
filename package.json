@@ -30,7 +30,6 @@
   },
   "files": [
     "dist",
-    "index.js",
     "logo.svg"
   ],
   "homepage": "https://github.com/webKrafters/auto-immutable/readme",
@@ -40,7 +39,7 @@
     "readonly"
   ],
   "license": "MIT",
-  "main": "index.js",
+  "main": "dist/index.js",
   "name": "@webkrafters/auto-immutable",
   "publishConfig": {
     "access": "public"
@@ -57,6 +56,6 @@
     "test:core": "jest --updateSnapshot",
     "test:watch": "jest --updateSnapshot --watchAll"
   },
-  "types": "dist/types.d.ts",
-  "version": "0.0.1"
+  "types": "dist/index.d.ts",
+  "version": "0.0.2.rc.0"
 }
