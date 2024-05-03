@@ -9,9 +9,7 @@
   ],
   "dependencies": {
     "@webkrafters/get-property": "^1.1.2",
-    "lodash.isempty": "^4.4.0",
-    "lodash.isequal": "^4.5.0",
-    "lodash.isplainobject": "^4.0.6"
+    "lodash": "^4.17.21"
   },
   "description": "Auto Immutable - self enforcing immutable data structure",
   "devDependencies": {
@@ -26,7 +24,6 @@
     "@types/node": "^20.11.28",
     "babel-loader": "^8.2.5",
     "jest": "^29.7.0",
-    "lodash": "^4.17.21",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.2"
