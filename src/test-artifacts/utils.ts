@@ -1,4 +1,4 @@
-import isPlainObject from 'lodash/isplainobject';
+import { isPlainObject } from 'lodash';
 
 export const isReadonly = v => {
 	let isReadonly = true;

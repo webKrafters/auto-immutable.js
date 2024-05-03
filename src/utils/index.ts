@@ -1,8 +1,7 @@
 import type { CloneDeepWithCustomizer } from 'lodash';
 import type { PropertyInfo } from '@webkrafters/get-property';
 
-import clonedeepwith from 'lodash/cloneDeepWith';
-import isPlainObject from 'lodash/isplainobject';
+import { cloneDeepWith, isPlainObject } from 'lodash';
 
 import checkEligibility from './clonedeep-eligibility-check';
 
@@ -62,7 +61,10 @@ export const clonedeep = (() => {
 		}
 		if( !checkEligibility( v ).isEligible ) { return v }
 	}
-	const clone = <T, R = T>( value : T , customizer : CloneDeepWithCustomizer<T> = defaultCustomizer ) : R => clonedeepwith( value, customizer );
+	const clone = <T, R = T>(
+		value : T ,
+		customizer : CloneDeepWithCustomizer<T> = defaultCustomizer
+	) : R => cloneDeepWith( value, customizer );
 	const clonedeep = <T, R = T>(value: T) : R => clone( value );
 	return clonedeep;
 })();

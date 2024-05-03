@@ -7,12 +7,14 @@ import type {
 	Value
 } from '../types';
 
-import isEqual from 'lodash/isequal';
-import isPlainObject from 'lodash/isplainobject';
+import { isEqual, isPlainObject } from 'lodash';
 
 import { clonedeep, isDataContainer } from '../utils';
 
-import tagFunctions, { isArrayOnlyTag, isClosedTag } from './tag-functions';
+import tagFunctions, {
+	isArrayOnlyTag,
+	isClosedTag
+} from './tag-functions';
 
 export default setValue;
 
