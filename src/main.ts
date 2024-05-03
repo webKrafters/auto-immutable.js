@@ -19,7 +19,7 @@ export const constants = _constants;
 
 export const Tag = {} as Readonly<TagTypeMap>;
 for( let k in constants ) {
-    if( !k.endsWith( '-TAG' ) ) { continue }
+    if( !k.endsWith( '_TAG' ) ) { continue }
     // istanbul ignore next
     Tag[ k.slice( 0, -4 ) ] = constants[ k ];
 };
