@@ -1,6 +1,8 @@
 # Auto Immutable JS
 
-<p><img height="240" src="logo.svg" width="640"></img></p>
+<p align="center">
+  <img height="240" src="logo.svg" width="640"></img>
+</p>
 
 # Introduction
 
