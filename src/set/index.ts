@@ -2,10 +2,10 @@ import type {
 	Changes,
 	Listener,
 	KeyType,
-	Tag as TagKey,
+	TagType,
 	UpdateStats as Stats,
 	Value
-} from '../types';
+} from '..';
 
 import { isEqual, isPlainObject } from 'lodash';
 
@@ -31,7 +31,7 @@ const setAtomic = (() => {
 			: undefined;
 	}
 	function finalizeAtomicSet( value : Value, changes : Value, valueKey : KeyType, compositeChangeDesc? : 'OBJECT' ) : void;
-	function finalizeAtomicSet( value : Value, changes : Value, valueKey : TagKey, compositeChangeDesc? : 'OBJECT' ) : void;
+	function finalizeAtomicSet( value : Value, changes : Value, valueKey : TagType, compositeChangeDesc? : 'OBJECT' ) : void;
 	function finalizeAtomicSet( value : Array<any>, changes : Value, valueKey : number, compositeChangeDesc? : 'ARRAY' ) : void;
 	function finalizeAtomicSet( value : Array<any>, changes : Value, valueKey : string /* numeric */, compositeChangeDesc? : 'ARRAY' ) : void;
 	function finalizeAtomicSet( value, changes, valueKey, compositeChangeDesc = undefined ) : void {
@@ -68,7 +68,7 @@ const setAtomic = (() => {
 		return setAtomic( value, changes, valueKey );
 	};
 	function setAtomic( value : Value, changes : Value, valueKey : KeyType, stats? : Stats ) : void;
-	function setAtomic( value : Value, changes : Value, valueKey : TagKey, stats? : Stats ) : void;
+	function setAtomic( value : Value, changes : Value, valueKey : TagType, stats? : Stats ) : void;
 	function setAtomic( value : Array<any>, changes : Value, valueKey : number, stats? : Stats ) : void;
 	function setAtomic( value : Array<any>, changes : Value, valueKey : string /* numeric */, stats? : Stats ) : void;
 	function setAtomic( value, changes, valueKey, stats = { hasChanges: false } ) : void {
@@ -115,8 +115,8 @@ function resolveTags(
 	changes : Changes<Value>,
 	valueKey : KeyType,
 	stats : Stats
-) : Array<TagKey> {
-	const resolvedTags : Array<TagKey> = [];
+) : Array<TagType> {
+	const resolvedTags : Array<TagType> = [];
 	if( isClosedTag( changes[ valueKey ] ) ) {
 		changes[ valueKey ] = { [ changes[ valueKey ] ]: null };
 	}
@@ -141,7 +141,7 @@ function resolveTags(
 			}
 			tagFunctions[ k ]( v, valueKey, stats, changes );
 			value[ valueKey ] = v[ valueKey ];
-			resolvedTags.push( k as TagKey );
+			resolvedTags.push( k as TagType );
 		}
 	}
 	return resolvedTags;

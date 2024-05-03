@@ -1,5 +1,5 @@
 import { Connection } from './connection';
-import { Closable, Immutable } from '.';
+import { Closable, Immutable } from './main';
 
 describe( 'Immutable class', () => {
     describe( 'identity', () => {

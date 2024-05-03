@@ -1,10 +1,10 @@
 import type {
 	BaseType,
-	Tag as TagKey,
 	TagCommand,
+	TagType,
 	UpdateStats as Stats,
 	Value
-} from '../../types'; 
+} from '../..'; 
 
 type Predicate = (
 	value : Value,
@@ -15,13 +15,13 @@ type Predicate = (
 type TaggedChanges<
 	T extends Array<any> | Value,
 	K extends keyof T,
-	TAG extends TagKey
+	TAG extends TagType
 > = Array<TagCommand<TAG, T> | BaseType> | Partial<T & {[P in K]: TagCommand<TAG, T> & Value}>
 
 type TagFunction = <
 	T extends Array<any> | Value,
 	K extends keyof T,
-	TAG extends TagKey
+	TAG extends TagType
 >(
 	value : T,
 	valueKey : K,
@@ -328,7 +328,7 @@ const tagMap = {
 export default tagMap;
 
 function containsTag (
-	tagsMap : Partial<{[K in TagKey]: any}>,
+	tagsMap : Partial<{[K in TagType]: any}>,
 	tag : any
 ) : boolean {
 	return tag in tagsMap && !Array.isArray( tag )
@@ -350,7 +350,7 @@ export const isArrayOnlyTag = (() => {
 		[ SPLICE_TAG ]: null
 	};
 	function fn( tag : BaseType ) : boolean;
-	function fn( tag : TagKey ) : boolean;
+	function fn( tag : TagType ) : boolean;
 	function fn( tag : any ) : boolean {
 		return containsTag( ARRAY_TAGS, tag );
 	}
@@ -374,16 +374,16 @@ export const isArrayOnlyTag = (() => {
 export const isClosedTag = (() => {
 	const NO_PARAM_TAGS = { [ CLEAR_TAG ]: null };
 	function fn( tag : BaseType ) : boolean;
-	function fn( tag : TagKey ) : boolean;
+	function fn( tag : TagType ) : boolean;
 	function fn( tag : any ) : boolean {
 		return containsTag( NO_PARAM_TAGS, tag );
 	}
 	return fn;
 })();
 
-function applyReplaceCommand<T extends Value, TAG extends TagKey>( tag : TAG, value : T, changes : {[K in keyof T]?: {[TT in TAG]: any}}, valueKey : keyof T, stats : Stats ) : void;
-function applyReplaceCommand<T extends Value, TAG extends TagKey>( tag : TAG, value : T, changes : {[x:string]: any}, valueKey : keyof T, stats : Stats ) : void;
-function applyReplaceCommand<T extends Value, TAG extends TagKey>( tag : any, value : any, changes : any, valueKey : any, stats : any ) : void {
+function applyReplaceCommand<T extends Value, TAG extends TagType>( tag : TAG, value : T, changes : {[K in keyof T]?: {[TT in TAG]: any}}, valueKey : keyof T, stats : Stats ) : void;
+function applyReplaceCommand<T extends Value, TAG extends TagType>( tag : TAG, value : T, changes : {[x:string]: any}, valueKey : keyof T, stats : Stats ) : void;
+function applyReplaceCommand<T extends Value, TAG extends TagType>( tag : any, value : any, changes : any, valueKey : any, stats : any ) : void {
 		const replacement = changes[ valueKey ][ tag ];
 	if( !( isDataContainer( value[ valueKey ] ) &&
 			isDataContainer( replacement )
@@ -421,9 +421,9 @@ function applyReplaceCommand<T extends Value, TAG extends TagKey>( tag : any, va
 
 const finishTagRequest = (() => {
 	const end = ( changes, key ) => { delete changes[ key ] };
-	function runCloser( changes : Value, key : keyof Value, tag : TagKey ) : void;
-	function runCloser( changes : Value, key : string, tag : TagKey ) : void;
-	function runCloser( changes : Value, key : symbol, tag : TagKey ) : void;
+	function runCloser( changes : Value, key : keyof Value, tag : TagType ) : void;
+	function runCloser( changes : Value, key : string, tag : TagType ) : void;
+	function runCloser( changes : Value, key : symbol, tag : TagType ) : void;
 	function runCloser( changes, key, tag ) : void {
 		if( isClosedTag( tag ) ) { return end( changes, key ) }
 		let keyCount = 0;

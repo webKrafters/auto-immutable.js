@@ -1,11 +1,11 @@
 import AccessorCache from './model/accessor-cache';
-import { Immutable } from '.';
+import { Immutable } from './main';
 import { deps, Connection } from './connection';
 
 describe( 'Connection class', () => { 
     const setup = () => {
         const cache = new AccessorCache({});
-        const imDeps = require( '.' ).deps;
+        const imDeps = require( './main' ).deps;
         const  assignCacheOrig = imDeps.assignCache;
         imDeps.assignCache = () => cache;
         const expectedId = 'TEST ID';

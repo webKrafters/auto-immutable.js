@@ -10,11 +10,11 @@ import type {
     Value,
     ValueObject,
     ValueObjectCloneable
-} from './types';
+} from '.';
 
 import setValue from './set';
 
-import { Immutable } from '.';
+import { Immutable } from './main';
 
 import AccessorCache from './model/accessor-cache';
 

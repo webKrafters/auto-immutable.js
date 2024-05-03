@@ -1,4 +1,7 @@
-import type { AccessorPayload, AccessorResponse } from '../../types';
+import type {
+	AccessorPayload,
+	AccessorResponse
+} from '../..';
 
 import type Atom from '../atom';
 
