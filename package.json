@@ -50,6 +50,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc && babel dist -d dist",
+    "docs-deploy": "node deploy-docs.js",
     "postbuild": "node post-build.js",
     "test": "jest --coverage --updateSnapshot",
     "test:clean": "jest --clearCache",
@@ -57,5 +58,5 @@
     "test:watch": "jest --updateSnapshot --watchAll"
   },
   "types": "dist/index.d.ts",
-  "version": "0.0.2-rc.1"
+  "version": "0.0.2-rc.2"
 }
