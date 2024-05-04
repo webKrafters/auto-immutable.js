@@ -1,6 +1,6 @@
 .DS_Store
 .history
-.tgz
+*.tgz
 .vscode
 coverage
 debug.log
