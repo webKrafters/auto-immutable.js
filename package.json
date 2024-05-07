@@ -1,8 +1,11 @@
 {
-  "alias": "auto-immutable",
-  "author": "Stephen Isienyi <stephen.isienyi@webkrafting.com>",
+  "alias": "auto-immutable.js",
+  "author": {
+    "email": "stephen.isienyi@webkrafting.com",
+    "name": "Stephen Isienyi"
+  },
   "bugs": {
-    "url": "https://github.com/webKrafters/auto-immutable/issues"
+    "url": "https://github.com/webKrafters/auto-immutable.js/issues"
   },
   "contributors": [
     "steveswork <stephen.isienyi@gmail.com> (https://github.com/steveswork)"
@@ -32,7 +35,7 @@
     "dist",
     "logo.svg"
   ],
-  "homepage": "https://github.com/webKrafters/auto-immutable/readme",
+  "homepage": "https://auto-immutable.js.org",
   "keywords": [
     "auto-immutable",
     "immutable",
@@ -46,11 +49,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/webKrafters/auto-immutable.git"
+    "url": "git+https://github.com/webKrafters/auto-immutable.js.git"
   },
   "scripts": {
     "build": "rm -rf dist && tsc && babel dist -d dist",
-    "docs-deploy": "node deploy-docs.js",
     "postbuild": "node post-build.js",
     "test": "jest --coverage --updateSnapshot",
     "test:clean": "jest --clearCache",
@@ -58,5 +60,5 @@
     "test:watch": "jest --updateSnapshot --watchAll"
   },
   "types": "dist/index.d.ts",
-  "version": "0.0.2-rc.2"
+  "version": "0.0.2-rc.3"
 }

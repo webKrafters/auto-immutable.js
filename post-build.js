@@ -10,7 +10,7 @@ const fOpts = { encoding: 'utf8' };
 Promise
     .allSettled([
         read(
-            path.join( 'docs', 'src', 'images', 'logo.svg' ),
+            path.join( 'docs-dev', 'src', 'images', 'logo.svg' ),
             fOpts
         ),
         read( 'logo.svg', fOpts )
