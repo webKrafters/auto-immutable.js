@@ -16,7 +16,8 @@ interface PropertyOriginInfo {
 	value: any
 };
 
-import { isEmpty, isEqual } from 'lodash';
+import isEmpty from 'lodash.isempty';
+import isEqual from 'lodash.isequal';
 
 import { GLOBAL_SELECTOR } from '../../constants';
 
