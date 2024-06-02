@@ -19,9 +19,9 @@ interface PropertyOriginInfo {
 import isEmpty from 'lodash.isempty';
 import isEqual from 'lodash.isequal';
 
-import { GLOBAL_SELECTOR } from '../../constants';
+import getProperty from '@webkrafters/get-property';
 
-import { getProperty } from '../../utils';
+import { GLOBAL_SELECTOR } from '../../constants';
 
 import Atom from '../atom';
 import Accessor from '../accessor';

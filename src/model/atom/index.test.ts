@@ -1,3 +1,10 @@
+import {
+	beforeAll,
+	describe,
+	expect,
+	test
+} from '@jest/globals';
+
 import Atom from '.';
 
 describe( 'Atom class', () => {

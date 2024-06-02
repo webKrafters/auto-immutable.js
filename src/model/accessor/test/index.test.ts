@@ -1,4 +1,12 @@
-import { getProperty } from '../../../utils';
+import {
+	beforeAll,
+	describe,
+	expect,
+	test
+} from '@jest/globals';
+
+import getProperty from '@webkrafters/get-property';
+
 import Atom from '../../atom';
 
 import Accessor from '..';
@@ -66,13 +74,13 @@ describe( 'Accessor class', () => {
 	describe( 'addClient(...)', () => {
 		test( 'adds new client id to `clients`', () => {
 			const numClients = accessor.numClients;
-			const id = expect.any( String );
+			const id = expect.any( String ) as unknown as string;
 			accessor.addClient( id );
 			expect( accessor.numClients ).toBe( numClients + 1 );
 			accessor.removeClient( id );
 		} );
 		test( 'ignores requests to add existing clients', () => {
-			const id = expect.any( String );
+			const id = expect.any( String ) as unknown as string;
 			accessor.addClient( id );
 			const numClients = accessor.numClients;
 			accessor.addClient( id );
@@ -83,12 +91,12 @@ describe( 'Accessor class', () => {
 	} );
 	describe( 'hasClient(...)', () => {
 		test( 'returns `false` if client not found in `clients`', () => {
-			const id = expect.any( String );
+			const id = expect.any( String ) as unknown as string;
 			accessor.removeClient( id );
 			expect( accessor.hasClient( id ) ).toBe( false );
 		} );
 		test( 'returns `true` if client found in `clients`', () => {
-			const id = expect.any( String );
+			const id = expect.any( String ) as unknown as string;
 			accessor.addClient( id );
 			expect( accessor.hasClient( id ) ).toBe( true );
 			accessor.removeClient( id );
@@ -96,14 +104,14 @@ describe( 'Accessor class', () => {
 	} );
 	describe( 'removeClient(...)', () => {
 		test( 'removes client id from `clients`', () => {
-			const id = expect.any( String );
+			const id = expect.any( String ) as unknown as string;
 			accessor.addClient( id );
 			const numClients = accessor.numClients;
 			accessor.removeClient( id );
 			expect( accessor.numClients ).toBe( numClients - 1 );
 		} );
 		test( 'ignores requests to remove non-existing clients', () => {
-			const id = expect.any( String );
+			const id = expect.any( String ) as unknown as string;
 			accessor.addClient( id );
 			accessor.removeClient( id );
 			const numClients = accessor.numClients;

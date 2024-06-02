@@ -1,4 +1,4 @@
-import { clonedeep } from '../../utils';
+import clonedeep from '@webkrafters/clone-total';
 
 const sourceData = {
 	_id: '639737cc5ac1df69cda79413',

@@ -1,4 +1,6 @@
-import { clonedeep, makeReadonly } from '../../utils';
+import clonedeep from '@webkrafters/clone-total';
+
+import { makeReadonly } from '../../utils';
 
 const isFunction = (() => {
 	const toString = Function.prototype.toString;
