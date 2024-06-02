@@ -7,9 +7,12 @@ import type {
 	Value
 } from '..';
 
-import { isEqual, isPlainObject } from 'lodash';
+import isEqual from 'lodash.isequal';
+import isPlainObject from 'lodash.isplainobject';
 
-import { clonedeep, isDataContainer } from '../utils';
+import clonedeep from '@webkrafters/clone-total';
+
+import { isDataContainer } from '../utils';
 
 import tagFunctions, {
 	isArrayOnlyTag,

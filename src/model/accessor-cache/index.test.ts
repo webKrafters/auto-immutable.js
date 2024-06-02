@@ -1,9 +1,20 @@
+import {
+	afterAll,
+	beforeAll,
+	describe,
+	expect,
+	jest,
+	test
+} from '@jest/globals';
+
 import type { SourceData } from '../../test-artifacts/data/create-data-obj';
 
 type Value = Partial<SourceData>;
 
+import clonedeep from '@webkrafters/clone-total';
+
 import * as constants from '../../constants';
-import { clonedeep } from '../../utils';
+
 import AccessorCache from '.';
 
 import _createSourceData from '../../test-artifacts/data/create-data-obj';
@@ -177,7 +188,10 @@ describe( 'AccessorCache class', () => {
 				},
 				'tags[4]': 'ullamco'
 			};
-			const retVal = cache.get( expect.any( String ), ...accessorPaths[ 0 ] );
+			const retVal = cache.get(
+				expect.any( String ) as unknown as string,
+				...accessorPaths[ 0 ]
+			);
 			test( 'is a compiled slice of value object as referenced in the propertyPaths', () => {
 				expect( retVal ).toEqual( retValExpected );
 			} );

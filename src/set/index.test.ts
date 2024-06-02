@@ -1,3 +1,14 @@
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	jest,
+	test
+} from '@jest/globals';
+
 import type { Changes } from '..';
 
 import type { SourceData } from '../test-artifacts/data/create-data-obj';
@@ -12,7 +23,7 @@ import {
 	SPLICE_TAG
 } from '../constants';
 
-import { clonedeep } from '../utils';
+import clonedeep from '@webkrafters/clone-total';
 
 import setValue from '.';
 
@@ -1145,17 +1156,19 @@ describe( 'setValue(...)', () => {
 
 			afterEach(() => { delete value.testing });
 
+			interface ExpectVal { value: Array<any>|Record<any, any> }
+
 			describe.each`
 				tag											| desc										| expected
 				${ CLEAR_TAG }								| ${ 'as a string tag' }					| ${ {} } 
 				${ [ CLEAR_TAG ] }							| ${ 'in array payload' }					| ${ { value: [ undefined ] } }
 				${ { 1: CLEAR_TAG } }						| ${ 'in indexed-object payload' }			| ${ { value: [ undefined, undefined ] } }	
-				${ { places: [ CLEAR_TAG, CLEAR_TAG ] } }	| ${ 'in a nested payload' }				| ${ { value: { places: [ undefined, undefined ] } } }	
+				${ { places: [ CLEAR_TAG, CLEAR_TAG ] } }	| ${ 'in a nested payload' }				| ${ { value: { places: [ undefined, undefined ] } } }
 				${ { places: CLEAR_TAG } }					| ${ 'as a string in a nested payload' }	| ${ { value: {} } }
-			`( `using '${ CLEAR_TAG }' tag property key $desc`, ({ tag, expected }) => {
+			`( `using '${ CLEAR_TAG }' tag property key $desc`, ({ tag, expected } : Record<string, unknown> ) => {
 				test( 'sets shallowly embedded tag', () => {
 					setValue( value, getShallowUpdate( tag ), onChange );
-					expect( value.testing ).toEqual( expected.value );
+					expect( value.testing ).toEqual( ( expected as ExpectVal ).value );
 				} );
 				test( 'sets deeply embedded tag', () => {
 					setValue( value, getUpdate( tag ), onChange );
@@ -1163,7 +1176,7 @@ describe( 'setValue(...)', () => {
 				} );
 				describe( 'from within an array slice ancestor context', () => {
 					test( 'is supported', () => {
-						expected = expected.value;
+						expected = ( expected as ExpectVal ).value;
 						setValue( value, getShallowUpdate([ tag ]) );
 						expect( value.testing ).toEqual([ expected ]);
 						delete value.testing;

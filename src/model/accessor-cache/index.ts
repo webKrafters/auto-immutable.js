@@ -16,11 +16,12 @@ interface PropertyOriginInfo {
 	value: any
 };
 
-import { isEmpty, isEqual } from 'lodash';
+import isEmpty from 'lodash.isempty';
+import isEqual from 'lodash.isequal';
+
+import getProperty from '@webkrafters/get-property';
 
 import { GLOBAL_SELECTOR } from '../../constants';
-
-import { getProperty } from '../../utils';
 
 import Atom from '../atom';
 import Accessor from '../accessor';

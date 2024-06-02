@@ -1,3 +1,11 @@
+import {
+	beforeAll,
+	describe,
+	expect,
+    jest,
+	test
+} from '@jest/globals';
+
 import AccessorCache from './model/accessor-cache';
 import { Immutable } from './main';
 import { deps, Connection } from './connection';
@@ -100,7 +108,7 @@ describe( 'Connection class', () => {
                     .spyOn( deps, 'setValue' )
                     .mockReturnValue( undefined );
 
-                connection.get( expect.any( Array ) );
+                connection.get( expect.any( Array ) as unknown as string );
                 expect( cacheGetSpy ).toHaveBeenCalledTimes( 1 );
                 connection.set( {} );
                 expect( setSpy ).toHaveBeenCalledTimes( 1 );
@@ -111,7 +119,7 @@ describe( 'Connection class', () => {
                 connection.disconnect();
 
                 expect( connection.disconnected ).toBe( true );
-                connection.get( expect.any( Array ) );
+                connection.get( expect.any( Array ) as unknown as string );
                 expect( cacheGetSpy ).not.toHaveBeenCalled();
                 connection.set( {} );
                 expect( setSpy ).not.toHaveBeenCalled();

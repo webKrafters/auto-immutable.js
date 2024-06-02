@@ -9,7 +9,7 @@ import type { Value } from '.';
 
 import * as _constants from './constants';
 
-import { clonedeep } from './utils';
+import clonedeep from '@webkrafters/clone-total';
 
 import AccessorCache from './model/accessor-cache';
 

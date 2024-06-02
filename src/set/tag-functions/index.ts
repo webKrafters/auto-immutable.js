@@ -29,11 +29,9 @@ type TagFunction = <
 	changes? : TaggedChanges<T, K, TAG>
 ) => void;
 
-import {
-	isEmpty,
-	isEqual,
-	isPlainObject
-}from 'lodash';
+import isEmpty from 'lodash.isempty';
+import isEqual from 'lodash.isequal';
+import isPlainObject from 'lodash.isplainobject';
 
 import {
 	CLEAR_TAG,
@@ -45,11 +43,10 @@ import {
 	SPLICE_TAG
 } from '../../constants';
 
-import {
-	clonedeep,
-	getProperty,
-	isDataContainer
-} from '../../utils/index';
+import clonedeep from '@webkrafters/clone-total';
+import getProperty from '@webkrafters/get-property';
+
+import { isDataContainer } from '../../utils/index';
 
 /**
  * Sets a value slice to its empty value equivalent

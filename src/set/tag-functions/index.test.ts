@@ -1,3 +1,12 @@
+import {
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	jest,
+	test
+} from '@jest/globals';
+
 import type { SourceData } from '../../test-artifacts/data/create-data-obj';
 
 import {
@@ -10,7 +19,7 @@ import {
 	SPLICE_TAG
 } from '../../constants';
 
-import { clonedeep } from '../../utils';
+import clonedeep from '@webkrafters/clone-total';
 
 import * as tag from '.';
 
