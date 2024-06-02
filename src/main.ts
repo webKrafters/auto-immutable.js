@@ -77,7 +77,7 @@ export class Immutable<T extends Value = Value> extends Closable {
 
     @invoke
     connect() {
-        return new Connection(
+        return new Connection<T>(
             `${ deps.numCreated }:${ ++this.#numConnectionsCreated }`, {
                 key: this,
                 map: Immutable.#cacheMap

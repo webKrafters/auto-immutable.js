@@ -46,11 +46,13 @@ import myImmutable from './my-immutable';
 
 const consumer = myImmutable.connect();
 
-const objectPath = 'a.b.c';
+const objectPaths = [ 'a.b.c', 'a.b' ];
 
-const data : AccessorResponse = consumer.get( objectPath );
-
-console.log( data ); // { 'a.b.c', 24 }
+const data : AccessorResponse = consumer.get( ...objectPaths );
+// => data = {
+//   'a.b': { c: 24 },
+//   'a.b.c': 24
+// }
 ```
 
 ### Manually Discard an AutoImmutable Consumer.
