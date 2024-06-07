@@ -1,14 +1,16 @@
-import type {
-	AccessorPayload,
-	AccessorResponse,
-	Changes,
-	UpdatePayload,
-	UpdatePayloadArray,
-	UpdatePayloadArrayCore,
-	UpdatePayloadArrayCoreCloneable,
-	UpdatePayloadCore,
-	UpdatePayloadCoreCloneable,
-	Value
+import {
+	Tag,
+	TagType,
+	type AccessorPayload,
+	type AccessorResponse,
+	type Changes,
+	type UpdatePayload,
+	type UpdatePayloadArray,
+	type UpdatePayloadArrayCore,
+	type UpdatePayloadArrayCoreCloneable,
+	type UpdatePayloadCore,
+	type UpdatePayloadCoreCloneable,
+	type Value
 } from '../..';
 
 interface PropertyOriginInfo {
@@ -52,18 +54,24 @@ class AccessorCache<T extends Value> {
 		const accessors = this.#accessors;
 		const atoms = this.#atoms;
 		const updatedPaths = [];
+		let tags : Array<TagType>;
 		for( const path in atoms ) {
 			const { exists, value: newAtomVal } = this.#getOriginAt( path );
 			if( path !== GLOBAL_SELECTOR && exists && (
 				newAtomVal === null || newAtomVal === undefined
 			) ) {
+				if( !tags ) { tags = Object.values( Tag ) }
 				/* istanbul ignore next */
 				if( !Array.isArray( originChanges ) ) {
-					if( !getProperty( originChanges, path ).trail.length ) { continue }
+					if( !getProperty( originChanges, path ).trail.length
+						&& !tags.some( tag => tag in originChanges )
+					) { continue }
 				} else {
 					let found = false;
 					for( let i = originChanges.length; i--; ) {
-						if( getProperty( originChanges, `${ i }.${ path }` ).trail.length ) {
+						if( getProperty( originChanges, `${ i }.${ path }` ).trail.length
+							|| tags.some( tag => tag in originChanges[ i ] )
+						) {
 							found = true;
 							break;
 						}
