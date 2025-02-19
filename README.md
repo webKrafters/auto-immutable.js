@@ -32,7 +32,7 @@ import AutoImmutable from '@webkrafters/auto-immutable';
 
 const initValue = { a: { b: { c: 24 } } };
 
-const aImmutable = new Immutable( initValue );
+const aImmutable = new AutoImmutable( initValue );
 
 export default aImmutable;
 ```
