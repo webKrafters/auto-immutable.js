@@ -27,9 +27,11 @@
     "@types/node": "^20.13.0",
     "babel-loader": "^8.2.5",
     "jest": "^29.7.0",
+    "lodash.clonedeepwith": "^4.5.0",
     "lodash.isempty": "^4.4.0",
     "lodash.isequal": "^4.5.0",
     "lodash.isplainobject": "^4.0.6",
+    "lodash.set": "^4.3.2",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.2"
@@ -48,9 +50,11 @@
   "main": "dist/index.js",
   "name": "@webkrafters/auto-immutable",
   "peerDependencies": {
+    "lodash.clonedeepwith": ">= 0.1.0",
     "lodash.isempty": ">= 0.1.0",
     "lodash.isequal": ">= 0.1.0",
-    "lodash.isplainobject": ">= 0.8.0"
+    "lodash.isplainobject": ">= 0.8.0",
+    "lodash.set": "> 0.1.0"
   },
   "publishConfig": {
     "access": "public"
