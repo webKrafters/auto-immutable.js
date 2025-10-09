@@ -1,18 +1,25 @@
-import type {
-	Changes,
-	Listener,
-	KeyType,
-	TagType,
+import {
 	UpdateStats as Stats,
-	Value
+	type Changes,
+	type ChangeInfo,
+	type Listener,
+	type KeyType,
+	type TagType,
+	type Value
 } from '..';
 
 import isEqual from 'lodash.isequal';
 import isPlainObject from 'lodash.isplainobject';
+import setProperty from 'lodash.set';
 
 import clonedeep from '@webkrafters/clone-total';
+import getProperty from '@webkrafters/get-property';
 
-import { isDataContainer } from '../utils';
+import {
+	arrangePropertyPaths,
+	isDataContainer,
+	makeReadonly
+} from '../utils';
 
 import tagFunctions, {
 	isArrayOnlyTag,
@@ -33,17 +40,26 @@ const setAtomic = (() => {
 			? 'OBJECT'
 			: undefined;
 	}
-	function finalizeAtomicSet( value : Value, changes : Value, valueKey : KeyType, compositeChangeDesc? : 'OBJECT' ) : void;
-	function finalizeAtomicSet( value : Value, changes : Value, valueKey : TagType, compositeChangeDesc? : 'OBJECT' ) : void;
-	function finalizeAtomicSet( value : Array<any>, changes : Value, valueKey : number, compositeChangeDesc? : 'ARRAY' ) : void;
-	function finalizeAtomicSet( value : Array<any>, changes : Value, valueKey : string /* numeric */, compositeChangeDesc? : 'ARRAY' ) : void;
-	function finalizeAtomicSet( value, changes, valueKey, compositeChangeDesc = undefined ) : void {
+	/**
+	 * settles those changes that do snot
+	 * map directly unto existing value 
+	 * properties.
+	 */
+	function finalizeAtomicSet( value : Value, changes : Value, valueKey : KeyType, stats : Stats, compositeChangeDesc? : 'OBJECT' ) : void;
+	function finalizeAtomicSet( value : Value, changes : Value, valueKey : TagType, stats : Stats, compositeChangeDesc? : 'OBJECT' ) : void;
+	function finalizeAtomicSet( value : Array<any>, changes : Value, valueKey : number, stats : Stats, compositeChangeDesc? : 'ARRAY' ) : void;
+	function finalizeAtomicSet( value : Array<any>, changes : Value, valueKey : string /* numeric */, stats : Stats, compositeChangeDesc? : 'ARRAY' ) : void;
+	function finalizeAtomicSet( value, changes, valueKey, stats : Stats, compositeChangeDesc = undefined ) : void {
 		const change = changes[ valueKey ];
 		/* istanbul ignore else */
 		if( !compositeChangeDesc ) {
 			/* istanbul ignore else */
 			if( !isClosedTag( change ) ) {
 				value[ valueKey ] = change;
+				stats.addChangePath([
+					...stats.currentPathToken,
+					valueKey
+				]);
 				return;
 			}
 		} else if( compositeChangeDesc === 'ARRAY' ) {
@@ -68,13 +84,14 @@ const setAtomic = (() => {
 				value[ valueKey ] = newValue;
 			}
 		}
-		return setAtomic( value, changes, valueKey );
+		stats.addChangePath([ ...stats.currentPathToken, valueKey ]);
+		return setAtomic( value, changes, valueKey, stats );
 	};
-	function setAtomic( value : Value, changes : Value, valueKey : KeyType, stats? : Stats ) : void;
-	function setAtomic( value : Value, changes : Value, valueKey : TagType, stats? : Stats ) : void;
-	function setAtomic( value : Array<any>, changes : Value, valueKey : number, stats? : Stats ) : void;
-	function setAtomic( value : Array<any>, changes : Value, valueKey : string /* numeric */, stats? : Stats ) : void;
-	function setAtomic( value, changes, valueKey, stats = { hasChanges: false } ) : void {
+	function setAtomic( value : Value, changes : Value, valueKey : KeyType, stats : Stats ) : void;
+	function setAtomic( value : Value, changes : Value, valueKey : TagType, stats : Stats ) : void;
+	function setAtomic( value : Array<any>, changes : Value, valueKey : number, stats : Stats ) : void;
+	function setAtomic( value : Array<any>, changes : Value, valueKey : string /* numeric */, stats : Stats ) : void;
+	function setAtomic( value, changes, valueKey, stats : Stats ) : void {
 		if( isEqual( value[ valueKey ], changes[ valueKey ] ) ) { return }
 		const tagsResolved = resolveTags( value, changes, valueKey, stats );
 		const compositeChangeDesc = getCompositeDesc( changes[ valueKey ] );
@@ -87,11 +104,12 @@ const setAtomic = (() => {
 			}
 		}
 		if( ( compositeChangeDesc as string ) === 'OBJECT' && isPlainObject( value[ valueKey ] ) ) {
-			return setPlainObject( value, changes, valueKey, stats )
+			return setPlainObject( value, changes, valueKey, stats );
 		}
-		if( tagsResolved.length || !( valueKey in changes ) ) { return };
-		stats.hasChanges = true;
-		finalizeAtomicSet( value, changes, valueKey, compositeChangeDesc );
+		if( tagsResolved.length || !( valueKey in changes ) ) {
+			return;
+		};
+		finalizeAtomicSet( value, changes, valueKey, stats, compositeChangeDesc );
 	};
 	return setAtomic;
 })();
@@ -173,14 +191,16 @@ function setArray<K extends string>(
 	stats : Stats
 ) : void;
 function setArray( value, changes, rootKey, stats : Stats ) : void {
+	stats.currentPathToken.push( rootKey );
 	const nsLength = changes[ rootKey ].length;
 	if( value[ rootKey ].length !== nsLength ) {
 		value[ rootKey ].length = nsLength;
-		stats.hasChanges = true;
+		stats.addChangePath( stats.currentPathToken );
 	}
 	for( let i = 0; i < nsLength; i++ ) {
 		setAtomic( value[ rootKey ], changes[ rootKey ], i, stats );
 	}
+	stats.currentPathToken.pop();
 }
 
 /** Mutates its arguments */
@@ -197,6 +217,7 @@ function setArrayIndex<K extends number | string /* numeric */ >(
 	stats : Stats
 ) : void;
 function setArrayIndex( value, changes, rootKey, stats : Stats ) : void {
+	stats.currentPathToken.push( rootKey );
 	const incomingIndexes = [];
 	for( const k in changes[ rootKey ] ) {
 		let index = +k;
@@ -211,18 +232,21 @@ function setArrayIndex( value, changes, rootKey, stats : Stats ) : void {
 	/* capture all newly created value array indexes into `changed` list */
 	if( maxIncomingIndex >= value[ rootKey ].length ) { 
 		value[ rootKey ].length = maxIncomingIndex + 1;
-		stats.hasChanges = true;
+		stats.addChangePath( stats.currentPathToken );
 	}
 	for( const i of incomingIndexes ) {
 		setAtomic( value[ rootKey ], changes[ rootKey ], i, stats );
 	}
+	stats.currentPathToken.pop();
 }
 
 /** Mutates its arguments */
 function setPlainObject( value : {}, changes : {}, rootKey : string, stats : Stats ) : void;
 function setPlainObject( value : {}, changes : {}, rootKey : symbol, stats : Stats ) : void;
 function setPlainObject( value, changes, rootKey, stats ) : void {
+	stats.currentPathToken.push( rootKey );
 	set( value[ rootKey ], changes[ rootKey ], stats );
+	stats.currentPathToken.pop();
 }
 
 function setValue<T extends Value>(
@@ -230,7 +254,7 @@ function setValue<T extends Value>(
 	changes : Changes<T>,
 	onValueChange? : Listener
 ) {
-	const stats = { hasChanges: false };
+	const stats = new Stats();
 	if( !Array.isArray( changes ) ) {
 		set( { value }, { value: clonedeep( changes ) }, stats );
 	} else {
@@ -238,5 +262,39 @@ function setValue<T extends Value>(
 			set( { value }, { value: clonedeep( _cGroup ) }, stats );
 		}
 	}
-	stats.hasChanges && onValueChange?.( changes );
+	if( onValueChange && stats.hasChanges ) {
+		const {
+			changes: c,
+			paths: p
+		} = distillChanges( value, stats.changedPathTable );
+		onValueChange(
+			makeReadonly( clonedeep( c ) ), 
+			makeReadonly( p )
+		);
+	}
+}
+
+function distillChanges<T extends object>(
+	source : T,
+	changedPaths : MapIterator<KeyType[]>
+) : ChangeInfo {
+	let propertyPathMap : {[x:string]: Array<KeyType>} = {};
+	for( let path of changedPaths ) {
+		path = path.slice( 1 );
+		propertyPathMap[ path.join( '.' ) ] = path;
+	}
+	const changes = {};
+	const paths : Array<Array<string>> = [];
+	for( const path of arrangePropertyPaths(
+		Object.keys( propertyPathMap )
+	) ) {
+		let pathTokens = propertyPathMap[ path ];
+		paths.push( pathTokens as string[] );
+		setProperty(
+			changes,
+			pathTokens,
+			getProperty( source, pathTokens )._value
+		);
+	}
+	return { changes, paths };
 }

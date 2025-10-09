@@ -39,22 +39,31 @@ export type SetTag = typeof SET_TAG;
 /** @see {@link https://auto-immutable.js.org/api/set/method/tags/splice-usage} */
 export type SpliceTag = typeof SPLICE_TAG;
 
-export type KeyType = number | string | symbol;
+export type KeyType = number|string|symbol;
 
-export type ScalarType = boolean | KeyType;
+export type ScalarType = boolean|KeyType;
 
 export type Cloneable<T extends object> = T & {
     clone?: ( ...args : Array<any> ) => T;
     cloneNode?: ( deep : true, ...args : Array<any> ) => T;
 };
 
-export type ValueObject = {[x: KeyType]: BaseType | Function};
+export interface ValueObject{[x: KeyType]: BaseType|Function|Value};
 export type ValueObjectCloneable = Cloneable<ValueObject>;
-export type Value = ValueObject | ValueObjectCloneable;
+export type Value = ValueObject|ValueObjectCloneable;
 
-export interface UpdateStats { hasChanges: boolean };
+export class UpdateStats {
+    private _changePathMap : Map<String, Array<KeyType>> = new Map();
+    private _currentPathToken : Array<KeyType> = [];
+    get changedPathTable() { return this._changePathMap.values() }
+    get currentPathToken(){ return this._currentPathToken }
+    get hasChanges(){ return this._changePathMap.size > 0 }
+    addChangePath( changePath : Array<KeyType> ) {
+        this._changePathMap.set( changePath.join( '.' ), changePath );
+    }
+}
 
-export type BaseType = Array<any> | ScalarType | Value | {} | object;
+export type BaseType = Array<any>|ScalarType|Value|{}|object;
 
 /** As in {"@@CLEAR":*} is a parameterless command. Parameters have not effect */
 export type ClearCommand = {[CLEAR_TAG]: any};
@@ -92,7 +101,15 @@ export interface AccessorResponse {[ propertyPath: string ]: Atom["value"]}; // 
 
 export type Changes<T extends Value> = UpdatePayload<T> | UpdatePayloadArray<T>;
 
-export type Listener = <T extends Value>(changes : Changes<T>) => void;
+export interface ChangeInfo{
+	changes : object
+	paths : Array<Array<string>>;
+};
+
+export type Listener = (
+    changes : Readonly<ChangeInfo["changes"]>,
+    paths : Readonly<ChangeInfo["paths"]>
+) => void;
 
 export type UpdatePayloadCore<T extends Array<any> | Value> =
     | ClearTag

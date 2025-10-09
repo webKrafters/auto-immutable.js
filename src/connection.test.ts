@@ -34,7 +34,9 @@ describe( 'Connection class', () => {
         teardown();
     } );
     describe( '', () => {
-        let passedFoundTest, passedNoneFoundTest, passedUpdateCompleteNotifiedTest;
+        let passedFoundTest : boolean;
+        let passedNoneFoundTest : boolean;
+        let passedUpdateCompleteNotifiedTest : boolean;
         let updateTest : {[x:string]:any} = {};
         beforeAll(() => {
             const { cache, connection, teardown } = setup();
@@ -58,6 +60,7 @@ describe( 'Connection class', () => {
             const prevCacheOrigin = { ...cache.origin };
 
             const setCallback = jest.fn();
+
             connection.set( protectedData, setCallback );
 
             updateTest.prevCacheOrigin = prevCacheOrigin;

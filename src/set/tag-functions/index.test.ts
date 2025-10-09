@@ -23,29 +23,31 @@ import clonedeep from '@webkrafters/clone-total';
 
 import * as tag from '.';
 
+import { UpdateStats as Stats } from '../../';
+
 import createSourceData from '../../test-artifacts/data/create-data-obj';
 
 let state : SourceData;
-let statsStub : {hasChanges: boolean};
+let statsStub : Stats;
 
 beforeAll(() => {
-	statsStub = { hasChanges: false };
+	statsStub = new Stats();
 	state = createSourceData();
 });
 
 describe( '$clear(...)', () => {
-	let _state;
+	let _state : SourceData;
 	beforeEach(() => { _state = createSourceData() });
 	test.each([
 		[ 'string', '', 'email' ],
 		[ 'POJO', {}, 'name' ],
 		[ 'array', [], 'tags' ]
 	])( 'sets %s property value to %p', ( type, emptyValue, stateKey ) => {
-		tag.$clear( _state, stateKey, statsStub, { [ stateKey ]: { [ CLEAR_TAG ]: expect.anything() } } );
+		tag.$clear( _state, stateKey as keyof typeof _state, statsStub, { [ stateKey ]: { [ CLEAR_TAG ]: expect.anything() } } );
 		expect( _state ).toEqual({ ...state, [ stateKey ]: emptyValue });
 	} );
 	describe( 'indexing', () => {
-		let expected;
+		let expected : SourceData;
 		beforeAll(() => {
 			expected = {
 				...state,

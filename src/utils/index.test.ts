@@ -12,7 +12,8 @@ import * as utils from '.';
 describe( 'utils module', () => {
 	describe( 'arrangePropertyPaths(...)', () => {
 		describe( 'subset propertyPaths', () => {
-			let actual, expected;
+			let actual : Array<string>;
+			let expected : Array<string>;
 			beforeAll(() => {
 				expected = [
 					'address',

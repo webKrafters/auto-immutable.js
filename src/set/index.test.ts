@@ -9,7 +9,7 @@ import {
 	test
 } from '@jest/globals';
 
-import type { Changes } from '..';
+import type { Changes, Listener } from '..';
 
 import type { SourceData } from '../test-artifacts/data/create-data-obj';
 
@@ -34,12 +34,15 @@ type Value = Partial<SourceData>
 describe( 'setValue(...)', () => {
 	const value : Value = createSourceData();
 	describe( 'basics', () => {
-		let newAge, changes, onChangeMock, prevAge;
+		let newAge : number;
+		let changes : Changes<Value>;
+		let onChangeMock : Listener;
+		let prevAge : number;
 		beforeAll(() => {
 			newAge = 56;
 			changes = { age: newAge };
 			onChangeMock = jest.fn();
-			prevAge = value.age;
+			prevAge = value.age as number;
 			setValue( value, changes, onChangeMock );
 		});
 		afterAll(() => { value.age = prevAge })
@@ -50,7 +53,9 @@ describe( 'setValue(...)', () => {
 		} );
 	} );
 	describe( 'attempt resulting in value change', () => {
-		let onChangeMock, registered, changes;
+		let onChangeMock : Listener;
+		let registered : Value["registered"];
+		let changes : Changes<Value>;
 		beforeAll(() => {
 			onChangeMock = jest.fn();
 			registered = clonedeep( value.registered );
@@ -69,14 +74,18 @@ describe( 'setValue(...)', () => {
 		});
 		afterAll(() => { value.registered = registered });
 		test( 'updates only new incoming changes', () => {
+			// @ts-ignore
 			expect( value.registered?.time ).toStrictEqual( registered.time );
 			[ 'day', 'year' ].forEach( k => {
-				expect( value.registered?.[ k ] ).not.toEqual( registered[ k ] );
+				// @ts-ignore
+				expect( value.registered[ k ] ).not.toEqual( registered[ k ] );
+				// @ts-ignore
 				expect( value.registered?.[ k ] ).toBe( changes.registered[ k ] );
 			} );
 			const value2 = createSourceData();
 			const registered2 = clonedeep( value2.registered );
 			const changes2 = clonedeep( changes );
+			// @ts-ignore
 			changes2.registered.time.hours = 17; // also add new `hours` value update to `time` object
 			setValue( value2, changes2 );
 			expect( value2.registered.time ).not.toEqual( registered2.time );
@@ -92,7 +101,8 @@ describe( 'setValue(...)', () => {
 		} );
 	} );
 	describe( 'attempt resulting in no value change', () => {
-		let onChangeMock, registered;
+		let onChangeMock : Listener;
+		let registered : Value["registered"];
 		beforeAll(() => {
 			onChangeMock = jest.fn();
 			registered = clonedeep( value.registered );
@@ -136,14 +146,15 @@ describe( 'setValue(...)', () => {
 	} );
 	describe( 'array value subtree', () => {
 		test( 'is wholly replaced if new value is neither an array nor an indexed object', () => {
-			const value = createSourceData() as typeof value & { friends : string };
-			const friends = 'TEST FRIEND STUB';
-			setValue( value, { friends } );
+			const value = createSourceData();
+			const friends = 'TEST FRIEND STUB' as unknown as Value["friends"];
+			setValue( value, { friends } as Changes<Value> );
 			expect( value.friends ).toBe( friends );
 		} );
 		describe( 'using indexed object to update array at specific indexes', () => {
-			let changes, onChangeMock;
-			let origFriendsSlice;
+			let changes : Changes<Value>;
+			let onChangeMock : Listener;
+			let origFriendsSlice : Value["friends"];
 			beforeAll(() => {
 				origFriendsSlice = clonedeep( value.friends );
 				changes = {
@@ -163,7 +174,7 @@ describe( 'setValue(...)', () => {
 				expect( Array.isArray( value.friends ) ).toBe( true );
 			} );
 			test( 'updates value with new changes', () => {
-				expect( value.friends?.[ 0 ] ).toEqual( origFriendsSlice[ 0 ] ); // remains untouched
+				expect( value.friends?.[ 0 ] ).toEqual( origFriendsSlice![ 0 ] ); // remains untouched
 				expect( value.friends?.[ 1 ].name.first ).toBe( changes.friends[ 1 ].name.first );
 				expect( value.friends?.[ 2 ] ).toEqual( changes.friends[ -1 ] );
 			} );

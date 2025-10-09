@@ -54,6 +54,7 @@ export class Connection<T extends Value> {
         }
         return true;
     }
+    
     get instanceId() { return this._id }
 
     @invoke
@@ -85,19 +86,18 @@ export class Connection<T extends Value> {
         deps.setValue(
             this._source.map.get( this._source.key ).origin,
             changes,
-            changes => {
+            ( changes, paths ) => {
                 // addresses eventual gc collection when not properly
                 // disposed. (i.e. w/o calling this.disconnect(...) prior)
                 // istanbul ignore next
                 if( this.disconnected ) { return }
                 this._source.map
                     .get( this._source.key )
-                    .atomize( changes as Changes<T> );
-                onComplete( changes );
+                    .atomize( changes, paths );
+                onComplete( changes, paths );
             }
         );
     }
-
 }
 
 function invoke<C>( method: Function, context: C ) {
