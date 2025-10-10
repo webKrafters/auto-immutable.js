@@ -17,6 +17,7 @@ import {
 import set from 'lodash.set';
 
 import clonedeep from '@webkrafters/clone-total';
+import get from '@webkrafters/get-property';
 
 import { makeReadonly } from '../../utils';
 
@@ -264,7 +265,7 @@ class AtomValueRepository<T extends Value> {
 		changes : Readonly<ChangeInfo["changes"]>,
 		paths : Readonly<ChangeInfo["paths"]>
 	) {
-		const nodeInfoList : Array<NodeInfo> = [];
+		let nodeInfoList : Array<NodeInfo> = [];
 		/* locate all nodes */
 		for( const tokens of paths ) {
 			const nodeInfo = createNodeInfo();
@@ -301,6 +302,81 @@ class AtomValueRepository<T extends Value> {
 				}
 			}
 		}
+
+		// ---- implement todos ---- //
+		let hasClearedLeaves = false;
+		let headInfoList : Array<NodeInfo> = [];
+		while( nodeInfoList.length ) {
+			for( const { cPathTokens, closestNode } of nodeInfoList ) {
+				const changePathLen = cPathTokens.length;
+				const nodePathLen = closestNode.propertyPathTokens.length
+				/* CASE: changed path points to a subset of atom node. */
+				if( changePathLen > nodePathLen ) {
+					set(
+						closestNode.value,
+						cPathTokens,
+						get( changes, cPathTokens )._value
+					);
+					if( closestNode.head && 'value' in closestNode.head ) {
+						// roll into ancestors values -> { ... }
+						const headValue = shallowCopy( closestNode.head.value );
+						set( headValue, cPathTokens, closestNode.value );
+						closestNode.head.value = headValue;
+					}
+					if( !hasClearedLeaves ) {
+						// set descendant atoms values to properties in new `node`.value
+						( function reconcileDescAtoms( _entryNode ) {
+							const { entries } = _entryNode.entries;
+							for( let n in entries ) {
+								const node = entries[ n ] as DescendantNode<Value>;
+								const newValue = get(
+									_entryNode.value,
+									node.propertyPathTokens
+								)._value;
+								if( isEqual( node.value, newValue ) ) { continue }
+								node.value = newValue;
+								reconcileDescAtoms( node );
+							}
+						} )( closestNode );
+						hasClearedLeaves = true;
+					}
+					const pTokens = closestNode.propertyPathTokens.slice( 0, -1 );
+					pTokens.length &&
+					!searchNodeInfoListByPath( pTokens, headInfoList ) &&
+					headInfoList.push( createNodeInfo( closestNode.head, pTokens ) );
+				}
+
+				
+			// 2. if `paths`.length > `nPaths`.length ( `paths` points to a subset of atom node)
+			//		a. set `node`.value to `changes`.value at `paths`
+			//		b. roll into ancestors values -> { ... }
+			//		c. set descendant atom values to properties in new `node`.value
+			//		d. reconcile the ancestral branches up the tree
+			// 		e. return untouched siblings across the tree
+			// 		f. return untouched descendants below the atom
+			// 3. if `paths`.length < `nPaths`.length ( `paths` points to a superset of atom node)
+			//		a. set `node`.value to `changes`.value at `paths`
+			//		b.0. if( higher ancestor atoms ) set its affected value property to `changes`.value
+			//		b.1. roll the last upper change into higher ancestors values -> { ... }
+			//		c. set descendant atom values to properties in new `node`.value
+			//		d. reconcile the ancestral branches up the tree
+			// 		e. return untouched siblings across the tree
+			// 		f. return untouched descendants below the atom
+			// 4. if `paths`.length === `nPaths`.length ( `paths` points to an exact atom node)
+			//		a. set `node`.value to `changes`.value at `paths`
+			//		b. roll into ancestors values -> { ... }
+			//		c. set descendant atom values to properties in new `node`.value
+			//		d. reconcile the ancestral branches up the tree
+			// 		e. return untouched siblings across the tree
+			// 		f. return untouched descendants below the atom
+
+
+			}
+			nodeInfoList = nextVisitationList;
+			nextVisitationList = [];
+		}
+				
+
 
 
 		// @todo : continue here...
@@ -456,4 +532,31 @@ function isAPrefixOfB<T>(
 		if( a[ i ] !== b[ i ] ) { return false }
 	}
 	return true;
+}
+
+function searchNodeInfoListByPath(
+	path : Array<string>,
+	nodeInfoList : Array<NodeInfo>
+) {
+	const pLen = path.length;
+	for( let n = nodeInfoList.length; n--; ) {
+		const nodeInfo = nodeInfoList[ n ];
+		if( nodeInfo[ n ].length !== pLen ) { continue }
+		let found = true;
+		for( let p = 0; p < pLen; p++ ) {
+			if( nodeInfo.cPathTokens[ p ] !== path[ p ] ) {
+				found = false; 
+				break;
+			}
+		}
+		if( found ) { return nodeInfo }
+	}
+}
+
+function shallowCopy<T>( data : T ) : T {
+	return isPlainObject( data )
+		? { ...data }
+		: Array.isArray( data )
+		? [ ...data ] as T
+		: data;
 }
