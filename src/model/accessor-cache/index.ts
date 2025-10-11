@@ -265,17 +265,17 @@ class AtomValueRepository<T extends Value> {
 		changes : Readonly<ChangeInfo["changes"]>,
 		paths : Readonly<ChangeInfo["paths"]>
 	) {
-		let nodeInfoList : Array<NodeInfo> = [];
-		/* locate all nodes */
+		let changedNodeInfoList : Array<NodeInfo> = [];
+		/* locate all atom nodes affected by changes */
 		for( const tokens of paths ) {
-			const nodeInfo = createNodeInfo();
+			const changedNodeInfo = createNodeInfo();
 			const node = this.data as DescendantNode<Value>;
 			while( 'entries' in node ) {
 				for( const e in node.entries ) {
 					const entryNode = node.entries[ e ] as DescendantNode<Value>;
 					const entryPathTokens = entryNode.propertyPathTokens;
 					if( isAPrefixOfB( entryPathTokens, tokens ) ) {
-						nodeInfoList.push((
+						changedNodeInfoList.push((
 							function verifyAtomNode( _node, _changedPathTokens ) {
 								for( const _e in _node.entries ) {
 									const _entryNode = _node.entries[ e ] as DescendantNode<Value>;
@@ -292,9 +292,9 @@ class AtomValueRepository<T extends Value> {
 							}
 						)( entryNode, tokens ));
 					} else if( isAPrefixOfB( tokens, entryPathTokens ) ) {
-						nodeInfo.closestNode = entryNode;
-						nodeInfo.cPathTokens = tokens;
-						nodeInfoList.push( nodeInfo )
+						changedNodeInfo.closestNode = entryNode;
+						changedNodeInfo.cPathTokens = tokens;
+						changedNodeInfoList.push({ ...changedNodeInfo });
 						if( tokens.length === entryPathTokens.length ) {
 							break;
 						}
@@ -306,81 +306,104 @@ class AtomValueRepository<T extends Value> {
 		// ---- implement todos ---- //
 		let hasClearedLeaves = false;
 		let headInfoList : Array<NodeInfo> = [];
-		while( nodeInfoList.length ) {
-			for( const { cPathTokens, closestNode } of nodeInfoList ) {
+		while( changedNodeInfoList.length ) {
+			for( const { cPathTokens, closestNode } of changedNodeInfoList ) {
 				const changePathLen = cPathTokens.length;
-				const nodePathLen = closestNode.propertyPathTokens.length
+				const nodePathLen = closestNode.propertyPathTokens.length;
+				const prevValue = closestNode.value;
 				/* CASE: changed path points to a subset of atom node. */
+				// nodePath: a.b.c.d
+				// changePath: a.b.c.d.e.0.w.e
 				if( changePathLen > nodePathLen ) {
 					set(
 						closestNode.value,
 						cPathTokens,
 						get( changes, cPathTokens )._value
 					);
-					if( closestNode.head && 'value' in closestNode.head ) {
-						// roll into ancestors values -> { ... }
-						const headValue = shallowCopy( closestNode.head.value );
-						set( headValue, cPathTokens, closestNode.value );
-						closestNode.head.value = headValue;
-					}
-					if( !hasClearedLeaves ) {
-						// set descendant atoms values to properties in new `node`.value
-						( function reconcileDescAtoms( _entryNode ) {
-							const { entries } = _entryNode.entries;
-							for( let n in entries ) {
-								const node = entries[ n ] as DescendantNode<Value>;
-								const newValue = get(
-									_entryNode.value,
-									node.propertyPathTokens
-								)._value;
-								if( isEqual( node.value, newValue ) ) { continue }
-								node.value = newValue;
-								reconcileDescAtoms( node );
-							}
-						} )( closestNode );
-						hasClearedLeaves = true;
-					}
-					const pTokens = closestNode.propertyPathTokens.slice( 0, -1 );
-					pTokens.length &&
-					!searchNodeInfoListByPath( pTokens, headInfoList ) &&
-					headInfoList.push( createNodeInfo( closestNode.head, pTokens ) );
+				}
+				/* CASE: changed path points to a subset of atom node. */
+				// nodePath: a.b.c.d.e.0.w.e
+				// changePath: a.b.c.d
+				else if( nodePathLen > changePathLen ) {
+					set(
+						closestNode.value,
+						closestNode.propertyPathTokens,
+						get( changes, closestNode.propertyPathTokens )._value
+					);
 				}
 
 				
-			// 2. if `paths`.length > `nPaths`.length ( `paths` points to a subset of atom node)
-			//		a. set `node`.value to `changes`.value at `paths`
-			//		b. roll into ancestors values -> { ... }
-			//		c. set descendant atom values to properties in new `node`.value
-			//		d. reconcile the ancestral branches up the tree
-			// 		e. return untouched siblings across the tree
-			// 		f. return untouched descendants below the atom
-			// 3. if `paths`.length < `nPaths`.length ( `paths` points to a superset of atom node)
-			//		a. set `node`.value to `changes`.value at `paths`
-			//		b.0. if( higher ancestor atoms ) set its affected value property to `changes`.value
-			//		b.1. roll the last upper change into higher ancestors values -> { ... }
-			//		c. set descendant atom values to properties in new `node`.value
-			//		d. reconcile the ancestral branches up the tree
-			// 		e. return untouched siblings across the tree
-			// 		f. return untouched descendants below the atom
-			// 4. if `paths`.length === `nPaths`.length ( `paths` points to an exact atom node)
-			//		a. set `node`.value to `changes`.value at `paths`
-			//		b. roll into ancestors values -> { ... }
-			//		c. set descendant atom values to properties in new `node`.value
-			//		d. reconcile the ancestral branches up the tree
-			// 		e. return untouched siblings across the tree
-			// 		f. return untouched descendants below the atom
+				// 3. if `paths`.length < `nPaths`.length ( `paths` points to a superset of atom node)
+				//		a. set `node`.value to `changes`.value at `paths`
+				//		b.0. if( higher ancestor atoms ) set its affected value property to `changes`.value
+				//		b.1. roll the last upper change into higher ancestors values -> { ... }
+				//		c. set descendant atom values to properties in new `node`.value
+				//		d. reconcile the ancestral branches up the tree
+				// 		e. return untouched siblings across the tree
+				// 		f. return untouched descendants below the atom
 
+				/* CASE 3: */
+				else if( /* ... */ ) {
+					// ...
+				}
 
-			}
-			nodeInfoList = nextVisitationList;
-			nextVisitationList = [];
-		}
+				// 4. if `paths`.length === `nPaths`.length ( `paths` points to an exact atom node)
+				//		a. set `node`.value to `changes`.value at `paths`
+				//		b. roll into ancestors values -> { ... }
+				//		c. set descendant atom values to properties in new `node`.value
+				//		d. reconcile the ancestral branches up the tree
+				// 		e. return untouched siblings across the tree
+				// 		f. return untouched descendants below the atom
+
 				
-
-
+				if( closestNode.head && 'value' in closestNode.head ) {
+					// roll into ancestors values -> { ... }
+					const headValue = shallowCopy( closestNode.head.value );
+					set( headValue, cPathTokens, closestNode.value );
+					closestNode.head.value = headValue;
+				}
+				if( !hasClearedLeaves ) {
+					// set descendant atoms values to properties in new `node`.value
+					const descendantNodes : Array<DescendantNode<Value>> = [];
+					const rootNode = this.data;
+					( function identifyAffectedDescNodes( data, oldData, currPath ) {
+						if( !Object.keys( oldData ).length || (
+							Array.isArray( oldData ) && !oldData.length
+						) ) {
+							data !== oldData && collectDistinctClosestNodes( rootNode, currPath, descendantNodes );
+							return;
+						}
+						if( Array.isArray( oldData ) ) {
+							for( let iLen = oldData.length, i = 0; i < iLen; i++ ) {
+								const thisCurrPath = [ ...currPath, `${ i }` ];
+								identifyAffectedDescNodes( data?.[ i ] as Readonly<T>, oldData[ i ] as Readonly<T>, thisCurrPath );
+								data?.[ i ] !== oldData[ i ] && collectDistinctClosestNodes( rootNode, thisCurrPath, descendantNodes );
+							}
+							return;
+						}
+						for( const k in oldData ) {
+							const thisCurrPath = [ ...currPath, k ];
+							identifyAffectedDescNodes( data?.[ k ] as Readonly<T>, oldData[ k ] as Readonly<T>, thisCurrPath );
+							data?.[ k ] !== oldData[ k ] && collectDistinctClosestNodes( rootNode, thisCurrPath, descendantNodes );
+						}
+					} )( closestNode.value, prevValue, closestNode.propertyPathTokens );
+					for( let dLen = descendantNodes.length, d = 0; d > dLen; d++ ) {
+						descendantNodes[ d ].value = get(
+							closestNode.value,
+							descendantNodes[ d ].propertyPathTokens
+						)._value;
+					}
+					hasClearedLeaves = true;
+				}
+				const pTokens = closestNode.propertyPathTokens.slice( 0, -1 );
+				pTokens.length &&
+				!searchNodeInfoListByPath( pTokens, headInfoList ) &&
+				headInfoList.push( createNodeInfo( closestNode.head, pTokens ) );
+			}
+		}
 
 		// @todo : continue here...
-		// 1. travese changeInfoList:
+		// 1. traverse changeInfoList:
 		// 2. if `paths`.length > `nPaths`.length ( `paths` points to a subset of atom node)
 		//		a. set `node`.value to `changes`.value at `paths`
 		//		b. roll into ancestors values -> { ... }
@@ -501,16 +524,27 @@ function carryoverDescendantValuesInto<T extends Value>( node : DescendantNode<T
 	}
 }
 
-function findNearestDescendantsFrom<T extends Value>( node : DescendantNode<T> ) {
-	const nearestDescendants : Array<DescendantNode<T>> = [];
-	for( let numEntries = Object.keys( node.entries ).length, e = 0; e < numEntries; e++ ) {
-		if( 'value' in node.entries[ e ] ) {
-			nearestDescendants.push( node.entries[ e ]);
-			continue;
-		}
-		nearestDescendants.push( ...findNearestDescendantsFrom( node.entries[ e ] ) );
+function collectDistinctClosestNodes<T extends Value>(
+	rootNode : AtomDataEntryNode<T>,
+	currentPath : Array<string>,
+	distinctNodes : Array<AtomDataEntryNode<T>> // output: a runninig over collected distinct closes nodes
+) {
+	const atomNode = findClosestNodeTo( currentPath, rootNode as DescendantNode<T> );
+	!containsNode(
+		distinctNodes as Array<DescendantNode<Value>>,
+		atomNode as DescendantNode<Value>
+	) &&
+	distinctNodes.push( atomNode );
+}
+
+function containsNode<T extends Value>(
+	hayStack : Array<DescendantNode<T>>,
+	needle : DescendantNode<T>
+) {
+	for( const node of hayStack ) {
+		if( node === needle ) { return true }
 	}
-	return nearestDescendants;
+	return false;
 }
 
 function createNodeInfo(
@@ -523,11 +557,49 @@ function createNodeInfo(
 	};
 }
 
+function findClosestNodeTo<T extends Value>(
+	propertyPathTokens : Array<string>,
+	rootNode : DescendantNode<T>
+) : AtomDataEntryNode<T> {
+	let closest : AtomDataEntryNode<T> = rootNode;
+	for( const key of propertyPathTokens ) {
+		if( !( 'propertyPathTokens' in rootNode ) ) {
+			rootNode = rootNode[ key ];
+			continue;
+		}
+		if( isAPrefixOfB( rootNode.propertyPathTokens, propertyPathTokens ) ) {
+			closest = rootNode;
+			if( rootNode.propertyPathTokens.length === propertyPathTokens.length ) {
+				return rootNode;
+			}
+			rootNode = rootNode[ key ];
+			continue;
+		} else if( isAPrefixOfB( propertyPathTokens, rootNode.propertyPathTokens ) ) {
+			return closest;
+		}
+		if( 'entries' in rootNode ) { return null }
+		rootNode = rootNode[ key ];
+	}
+	return null;
+}
+
+function findNearestDescendantsFrom<T extends Value>( rootNode : DescendantNode<T> ) {
+	const nearestDescendants : Array<DescendantNode<T>> = [];
+	for( let numEntries = Object.keys( rootNode.entries ).length, e = 0; e < numEntries; e++ ) {
+		if( 'value' in rootNode.entries[ e ] ) {
+			nearestDescendants.push( rootNode.entries[ e ]);
+			continue;
+		}
+		nearestDescendants.push( ...findNearestDescendantsFrom( rootNode.entries[ e ] ) );
+	}
+	return nearestDescendants;
+}
+
 function isAPrefixOfB<T>(
 	{ length: aLen, ...a } : Array<T>,
 	b : Array<T>
 ) {
-	if( aLen >= b.length ) { return false }
+	if( aLen > b.length ) { return false }
 	for( let i = 0; i < aLen; i++ ) {
 		if( a[ i ] !== b[ i ] ) { return false }
 	}
