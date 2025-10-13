@@ -234,56 +234,6 @@ export class AtomChangeInfoSet {
 		this._collections.set( node.pathNum, nodeInfo );
 	}
 	list() { return [ ...this._collections.values() ] }
-	prefixesOf( tokens : Array<string> ) : Array<AtomChangeInfo> {
-		const prefixes : Array<AtomChangeInfo> = [];
-		for( let node = this.nodeAt( tokens ); !!node; node = node.head ) {
-			'pathNum' in node && prefixes.push(
-				this._collections.get( node.pathNum )
-			);
-		}
-		return prefixes;
-	}
-	remove( tokens : Array<string> ) {
-		let node = this.nodeAt( tokens );
-		if( !node || !node.isPath ) { return }
-		delete node.isPath;
-		this._collections.delete( node.pathNum )
-		delete node.pathNum;
-		if( node.children.size ) { return }
-		while( true ) {
-			if( node.isPath ) { return }
-			const key = node.value.incomingChangePath.at( -1 );
-			node = node.head;
-			if( !node ) { return }
-			node.children.delete( key );
-		}
-	}
-	suffixesOf( tokens : Array<string> ) : Array<AtomChangeInfo> {
-		return this.collectDescendantPathsOf( this.nodeAt( tokens ) );
-	}
-	private collectDescendantPathsOf(
-		node : TokenSearchNode,
-		nodeInfoList : Array<AtomChangeInfo> = []
-	) : Array<AtomChangeInfo> {
-		if( !node ) { return nodeInfoList }
-		node.pathNum && nodeInfoList.push(
-			this._collections.get( node.pathNum )
-		);
-		for( const v of node.children.values() ) {
-			this.collectDescendantPathsOf( v );
-		}
-		return nodeInfoList;
-	}
-	private nodeAt( tokens : Array<string> ) : TokenSearchNode {
-		let data = this._data;
-		let node : TokenSearchNode = null;
-		for( let tLen = tokens.length, t = 0; t < tLen; t++ ) {
-			node = data.get( tokens[ t ] );
-			if( !node ) { return null }
-			data = node.children;
-		}
-		return node;
-	}
 }
 
 const tokenizeStringByDots = (() => {
@@ -391,6 +341,51 @@ class AtomValueRepository<T extends Value> {
 			}
 		}
 
+
+		const changedNodeInfoList = changedNodeInfoSet.list();
+
+		for( let cLen = changedNodeInfoList.length, c = 0; c < cLen; c++ ) {
+			const { incomingChangePath, atomRepoNode } = changedNodeInfoList[ c ]
+			const rootAtomNode = this.findRootAtomNodeFor( atomRepoNode as DescendantNode<T> );
+			makePathWriteable( rootAtomNode, atomRepoNode );
+			const nodePath = atomRepoNode.propertyPathTokens;
+			if( incomingChangePath.length > nodePath.length ) {
+				/* CASE: changed path points to a subset of an atom node. */
+				// nodePath: a.b.c.d
+				// changePath: a.b.c.d.e.0.w.e
+				let atomValue = get( atomRepoNode.value, nodePath.slice( rootAtomNode.propertyPathTokens.length ) );
+				for( let i = nodePath.length; i < incomingChangePath.length; i++ ) {
+					// @ts-expect-error
+					atomValue = shallowCopy( atomValue );
+					if( atomValue === undefined ) { break }
+					atomValue = atomValue[ incomingChangePath[ i ] ];
+				}
+				set(
+					atomRepoNode.value,
+					incomingChangePath,
+					get( changes, incomingChangePath )._value
+				);
+			} else {
+				/* CASE: changed path points to a superset of an atom node. */
+				// nodePath: a.b.c.d.e.0.w.e
+				// changePath: a.b.c.d[.e.0.w.e]
+				set(
+					atomRepoNode.value,
+					atomRepoNode.propertyPathTokens,
+					get( changes, atomRepoNode.propertyPathTokens )._value
+				);
+			}
+		}
+
+		// --- move salvageables from below linie into above --- //
+
+		for( const {
+			incomingChangePath,
+			atomRepoNode
+		} of changedNodeInfoList ) {
+
+		}
+
 		let hasClearedLeaves = false;
 		let headInfoSet = new AtomChangeInfoSet();
 		while( changedNodeInfoSet.size ) {
@@ -460,7 +455,8 @@ class AtomValueRepository<T extends Value> {
 					hasClearedLeaves = true;
 				}
 				headInfoSet.add( createAtomChangeInfo(
-					atomRepoNode.head, atomRepoNode.propertyPathTokens.slice( 0, -1 )
+					atomRepoNode.head,
+					atomRepoNode.propertyPathTokens.slice( 0, -1 )
 				) );
 			}
 			changedNodeInfoSet = headInfoSet;
@@ -502,12 +498,8 @@ class AtomValueRepository<T extends Value> {
 		propertyPath : Array<string>
 	) : void; 
 	removeAtomDataAt( propertyPath ) : void {
-		let node = this._data as DescendantNode<T>;
-		for( let tokens = tokenizeStringByDots( propertyPath ), tLen = tokens.length, t = 0; t < tLen; t++ ){
-			node = node.entries?.[ tokens[ t ] ];
-			/* if not found, abandon removal operation */
-			if( !node ) { return }
-		}
+		let node = this.atomNodeAt( propertyPath );
+		if( !node ) { return }
 		// if there are descendants of this node simply excuse
 		// this node and leave the descendants undisturbed.
 		if( 'entries' in node ) {
@@ -571,7 +563,31 @@ class AtomValueRepository<T extends Value> {
 			numTokensToCurrUpdate--;
 		}
 		currNode.value = makeReadonly( currNode.value );
-	}	
+	}
+	private findRootAtomNodeFor( node : DescendantNode<T> ) : DescendantNode<T> {
+		node = node.head;
+		if( node ) {
+			const head = node.head;
+			if( !head ) { return node }
+			node = head;
+		}
+		return node;
+	}
+
+	private atomNodeAt( propertyPath : string ) : DescendantNode<T>;
+	private atomNodeAt(
+		/* split property path string */
+		propertyPath : Array<string>
+	) : DescendantNode<T>; 
+	private atomNodeAt( propertyPath ) : DescendantNode<T> {
+		let node = this._data as DescendantNode<T>;
+		for( let tokens = tokenizeStringByDots( propertyPath ), tLen = tokens.length, t = 0; t < tLen; t++ ){
+			node = node.entries?.[ tokens[ t ] ];
+			/* if not found, abandon removal operation */
+			if( !node ) { return }
+		}
+		return node;
+	}
 }
 
 function carryoverDescendantValuesInto<T extends Value>( node : DescendantNode<T> ) {
@@ -690,10 +706,33 @@ function searchNodeInfoListByPath(
 	}
 }
 
-function shallowCopy<T>( data : T ) : T {
+function makePathWriteable<T extends Value>(
+	fromPathNode : DescendantNode<T>,
+	toPathNode : DescendantNode<T>
+) {
+	if( !fromPathNode.propertyPathTokens?.length ) { return }
+	if( Object.isFrozen( fromPathNode.value ) ) {
+		// @ts-expect-error
+		fromPathNode.value = shallowCopy( fromPathNode.value );
+	}
+	let value = fromPathNode.value;
+	for( let keys = toPathNode.propertyPathTokens.slice(
+		fromPathNode.propertyPathTokens.length
+	), kLen = keys.length, k = 0; k < kLen; k++ ) {
+		const key = keys[ k ];
+		if( Object.isFrozen( value[ key ] ) ) {
+			// @ts-expect-error
+			value[ key ] = shallowCopy( value[ key ] );
+		}
+		// @ts-expect-error
+		value = value[ key ];
+	}
+}
+
+function shallowCopy( data : unknown ) : unknown {
 	return isPlainObject( data )
-		? { ...data }
+		? { ...data as {} }
 		: Array.isArray( data )
-		? [ ...data ] as T
+		? [ ...data ]
 		: data;
 }
