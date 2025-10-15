@@ -92,7 +92,6 @@ import Accessor from '../accessor';
 class AccessorCache<T extends Value> {
 	private _accessors : {[propertyPaths: string]: Accessor} = {};
 	private _atoms : AccessorPayload = {};
-	// private _origin : T;
 
 	private _valueRepo : AtomValueRepository<T>;
 
@@ -265,9 +264,9 @@ class AtomValueRepository<T extends Value> {
 	) : void; 
 	addDataForAtomAt( propertyPath ) : void {
 		const tokens = tokenizeStringByDots( propertyPath );
-		let rootPathTokens : typeof tokens = [];
+		let rootAtomNode : DescendantNode<T>;
 		let counter = 0;
-		let currNode = this._data;
+		let currNode = this._data as DescendantNode<T>;
 		while( counter < tokens.length ) {
 			const currKey = tokens[ counter ];
 			if( !( currKey in currNode.entries ) ) {
@@ -275,18 +274,19 @@ class AtomValueRepository<T extends Value> {
 					entries: {},
 					head: currNode
 				};
-			} else if( !rootPathTokens.length && 'value' in currNode ) {
-				rootPathTokens = tokens.slice( 0, counter );
+			} else if( !rootAtomNode && 'value' in currNode ) {
+				rootAtomNode = currNode as DescendantNode<T>;
 			}
 			currNode = currNode.entries[ currKey ];
 			counter++;
 		}
-		if( Object.keys( currNode.entries ).length ) {
+		currNode.fullPath = tokens;
+		if( !Object.keys( currNode.entries ).length ) {
 			delete currNode.entries;
 		}
-		rootPathTokens.length
-			? this.addDescendantAtomData( currNode as DescendantNode<T>, tokens, rootPathTokens )
-			: this.addRootAtomData( currNode as DescendantNode<T>, tokens );
+		rootAtomNode
+			? this.addDescendantAtomData( currNode as DescendantNode<T>, rootAtomNode )
+			: this.addRootAtomData( currNode as DescendantNode<T> );
 	}
 	
 	getOriginValueAt( propertyPath : string ) : PropertyOriginInfo;
@@ -507,65 +507,38 @@ class AtomValueRepository<T extends Value> {
 		// this node and leave the descendants undisturbed.
 		if( 'entries' in node ) {
 			delete node.fullPath;
+			delete node.pathToRootAtom;
 			delete node.value;
+			const rootAtomNode = this.findRootAtomNodeFor( node );
+			if( !rootAtomNode ) { return }
+			// @todo : recalculate `pathToRootAtom` fields for all descendant atoms.
 			return;
 		}
 		/* if leaf, clean up all associated precendent atomless branches */
-		const { fullPath } = node as DescendantNode<T>;
-		while( fullPath.length ) {
+		const pathToRootAtom = ( node as DescendantNode<T> ).pathToRootAtom.slice();
+		while( pathToRootAtom.length ) {
 			node = node.head;
-			delete node.entries[ fullPath.pop() ];
-			/* preempt cleanup if root reached or branch has other atom(s) */
-			if( !node.head || (
-				Object.keys( node.entries ).length
-			) ) { return }
+			const key = pathToRootAtom.pop();
+			if( Object.keys( node.entries ).length > 1 ) {
+				delete node.entries[ key ];
+			} else {
+				delete node.entries;
+			}
 		}
+
 	}
 
-	private addRootAtomData(
-		entryNode : DescendantNode<T>,
-		entryPathTokens : Array<string>
-	) {
-		entryNode.value = clonedeep( getProperty( this.origin, entryPathTokens )?.value );
-		entryNode.fullPath = entryPathTokens;
+	private addRootAtomData( entryNode : DescendantNode<T> ) {
+		entryNode.value = clonedeep( getProperty( this.origin, entryNode.fullPath )?._value );
 		carryoverDescendantValuesInto( entryNode );
 		entryNode.value = makeReadonly( entryNode.value );
 	}
 	private addDescendantAtomData(
 		entryNode : DescendantNode<T>,
-		entryPathTokens : Array<string>,
-		rootEntryPathTokens : Array<string>
+		rootAtomNode : DescendantNode<T>
 	) {
-		if( !isAPrefixOfB( rootEntryPathTokens, entryPathTokens ) ) {
-			throw new Error( '`rootEntryPathTokens` argument must be of the same first N elements in the `entryPathTokens` argument.' );
-		}
-		this.addRootAtomData( entryNode, entryPathTokens );
-		let currNode = entryNode;
-		let nearestDescendant = currNode;
-		let numTokensToCurrUpdate = entryPathTokens.length;
-		const numTokensToRoot = rootEntryPathTokens.length;
-		while( numTokensToCurrUpdate >= numTokensToRoot ) {
-			const head : DescendantNode<T> = currNode.head;
-			if( !( 'value' in head ) ) {
-				currNode = head;
-				numTokensToCurrUpdate--;
-				continue;
-			}
-			if( isPlainObject( head.value ) ) {
-				head.value = { ...head.value };
-			} else if( Array.isArray( head.value ) ) {
-				head.value = [ ...head.value ] as unknown as Readonly<T>;
-			}
-			set(
-				head.value,
-				nearestDescendant.fullPath,
-				nearestDescendant.value
-			);
-			currNode = head;
-			nearestDescendant = currNode;
-			numTokensToCurrUpdate--;
-		}
-		currNode.value = makeReadonly( currNode.value );
+		entryNode.pathToRootAtom = entryNode.fullPath.slice( rootAtomNode.fullPath.length );
+		entryNode.value = get( rootAtomNode.value, entryNode.pathToRootAtom )._value;
 	}
 	private findRootAtomNodeFor( node : DescendantNode<T> ) : DescendantNode<T> {
 		node = node.head;
@@ -598,12 +571,11 @@ function carryoverDescendantValuesInto<T extends Value>( node : DescendantNode<T
 	if( !nearestDescendants.length ) {
 		delete node.entries;
 	} else {
+		const relPathStartIndex = node.fullPath.length;
 		for( let n = nearestDescendants.length; n--; ) {
-			set(
-				node.value,
-				nearestDescendants[ n ].fullPath,
-				nearestDescendants[ n ].value
-			);
+			const nDesc = nearestDescendants[ n ];
+			nDesc.pathToRootAtom = nDesc.fullPath.slice( relPathStartIndex );
+			set( node.value, nDesc.pathToRootAtom, nDesc.value );
 		}
 	}
 }

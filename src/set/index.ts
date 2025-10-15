@@ -263,13 +263,10 @@ function setValue<T extends Value>(
 		}
 	}
 	if( onValueChange && stats.hasChanges ) {
-		const {
-			changes: c,
-			paths: p
-		} = distillChanges( value, stats.changedPathTable );
+		const info = distillChanges( value, stats.changedPathTable );
 		onValueChange(
-			makeReadonly( clonedeep( c ) ), 
-			makeReadonly( p )
+			makeReadonly( clonedeep( info.changes ) ),
+			makeReadonly( info.paths )
 		);
 	}
 }
