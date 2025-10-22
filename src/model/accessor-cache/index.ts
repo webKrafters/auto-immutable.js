@@ -1,87 +1,24 @@
 import {
-	Tag,
-	TagType,
 	type AccessorPayload,
 	type AccessorResponse,
-	type Changes,
 	type ChangeInfo,
-	type UpdatePayload,
-	type UpdatePayloadArray,
-	type UpdatePayloadArrayCore,
-	type UpdatePayloadArrayCoreCloneable,
-	type UpdatePayloadCore,
-	type UpdatePayloadCoreCloneable,
 	type Value
 } from '../..';
 
-interface AtomChangeInfo {
-	atomRepoNode : DescendantNode<Value>;
-	incomingChangePath : Array<string>;
-}
-
-interface AtomDataEntryNode<T extends Value> {}
-
-interface HeadNode<T extends Value> extends AtomDataEntryNode<T>{
-	entries : {
-		[ key : string ]: BaseEntryNode<T>
-	};
-}
-
-interface BaseEntryNode<T extends Value> extends AtomDataEntryNode<T> {
-	entries : {
-		[ key : string ]: BaseDescendantNode<T>
-	};
-	head : HeadNode<T>;
-}
-interface EntryNode<T extends Value> extends BaseEntryNode<T>{
-	fullPath? : Array<string>;
-	pathToRootAtom? : Array<string>;
-	value : T;
-}
-interface BaseDescendantNode<T extends Value> extends AtomDataEntryNode<T> {
-	entries : {
-		[ key : string ]: BaseDescendantNode<T>
-	};
-	head : BaseDescendantNode<T>;
-}
-interface LeafDescendantNode<T extends Value> extends BaseDescendantNode<T> {
-	fullPath? : Array<string>;
-	pathToRootAtom? : Array<string>;
-	value : Readonly<T>;
-}
-interface DescendantNode<T extends Value> extends BaseDescendantNode<T> {
-	entries : {
-		[ key : string ]: BaseDescendantNode<T>
-	};
-	fullPath? : Array<string>;
-	pathToRootAtom? : Array<string>;
-	value? : Readonly<T>;
-}
 
 interface PropertyOriginInfo {
-	exists: boolean,
+	exists: boolean;
 	value: any;
-};
-
-export interface TokenSearchNode {
-	children : Map<string, TokenSearchNode>;
-	pathNum? : number;
-	head : TokenSearchNode;
-	isPath? : boolean;
-	value : AtomChangeInfo;
 };
 
 import set from 'lodash.set';
 
-import clonedeep from '@webkrafters/clone-total';
 import get from '@webkrafters/get-property';
 
-import { makeReadonly } from '../../utils';
-
 import isEmpty from 'lodash.isempty';
-import isEqual from 'lodash.isequal';
 import isPlainObject from 'lodash.isplainobject';
 
+import cloneDeep from '@webkrafters/clone-total';
 import getProperty from '@webkrafters/get-property';
 
 import { GLOBAL_SELECTOR } from '../../constants';
@@ -105,48 +42,7 @@ class AccessorCache<T extends Value> {
 		changes : Readonly<ChangeInfo["changes"]>,
 		paths : Readonly<ChangeInfo["paths"]>
 	) : void {
-
-		if( !paths.length ) { return }
-		this._valueRepo.mergeChanges( changes, paths );
-
-		// -----
-
-
-
-		const accessors = this._accessors;
-		const atoms = this._atoms;
-		const updatedPathMap = {};
-		let tags : Array<TagType>;
-		for( const path in atoms ) {
-			const { exists, value: newAtomVal } = this.getOriginAt( path );
-			if( path !== GLOBAL_SELECTOR && exists && (
-				newAtomVal === null || newAtomVal === undefined
-			) ) {
-				if( !tags ) { tags = Object.values( Tag ) }
-				/* istanbul ignore next */
-				if( !Array.isArray( changes ) ) {
-					if( !getProperty( changes, path ).trail.length
-						&& !tags.some( tag => tag in changes )
-					) { continue }
-				} else {
-					let found = false;
-					for( let i = changes.length; i--; ) {
-						if( getProperty( changes, `${ i }.${ path }` ).trail.length
-							|| tags.some( tag => tag in changes[ i ] )
-						) {
-							found = true;
-							break;
-						}
-					}
-					if( !found ) { continue }
-				}
-			}
-			if( isEqual( newAtomVal, atoms[ path ].value ) ) { continue }
-			atoms[ path ].setValue( newAtomVal );
-			updatedPathMap[ path ] = true;
-		}
-		if( !Object.keys( updatedPathMap ).length ) { return }
-		for( const k in accessors ) { accessors[ k ].outdatedPaths.push( ...Object.keys( updatedPathMap ) ) }
+		paths.length && this._valueRepo.mergeChanges( changes, paths );
 	}
 
 	/**
@@ -207,37 +103,6 @@ class AccessorCache<T extends Value> {
 
 export default AccessorCache;
 
-export class AtomChangeInfoSet {
-	private _collections = new Map<number, AtomChangeInfo>();
-	private _data = new Map<string, TokenSearchNode>();
-	private _currIdNum = -1;
-	get size() { return this._collections.size }
-	clear() {
-		this._collections.clear();
-		this._currIdNum = -1;
-		this._data.clear();
-	}
-	add( nodeInfo : AtomChangeInfo ) {
-		let data = this._data;
-		let node : TokenSearchNode = null;
-		for( let tokens = nodeInfo.incomingChangePath, tLen = tokens.length, t = 0; t < tLen; t++ ) {
-			const token = tokens[ t ];
-			!data.has( token ) && data.set( token, {
-				children: new Map<string, TokenSearchNode>(),
-				head: node,
-				value: nodeInfo
-			} );
-			node = data.get( token );
-			data = node.children;
-		}
-		if( node.isPath ) { return }
-		node.isPath = true;
-		node.pathNum = ++this._currIdNum;
-		this._collections.set( node.pathNum, nodeInfo );
-	}
-	list() { return [ ...this._collections.values() ] }
-}
-
 const tokenizeStringByDots = (() => {
 	const pathSplitPtn = /\./g;
 	function t( str : string ) : Array<string>;
@@ -252,8 +117,341 @@ const tokenizeStringByDots = (() => {
 	return t;
 })();
 
-class AtomValueRepository<T extends Value> {
-	private _data : HeadNode<T> = { entries: {} };
+class ArrayUnique<T = any> extends Array<T> {
+	push( ...nodes : Array<any> ) {
+		let newLen = this.length;
+		for( let nLen = nodes.length, n = 0; n < nLen; n++ ) {
+			if( this.indexOf( nodes[ n ] ) !== -1 ) { continue }
+			super.push( nodes[ n ] );
+			newLen++;
+		}
+		return newLen;
+	}
+}
+
+class AtomNode<T extends Value>{
+	private _branches : Record<string, AtomNode<T>> = {};
+	private _fullPath : Array<string> = []; 
+	private _head : AtomNode<T> = null;
+	private _isActiveNode : boolean = false;
+	private _pathToRootAtom : Array<string> = [];
+	private _rootAtomNode : AtomNode<T> = null;
+	private _sectionData : Readonly<T> = null;
+	/**
+	 * @param head - parent node
+	 * @param fullPath - property path tokens pointed to within the immutable data store.
+	 * @param rootAtomNode - a root atom node whose this node is a descendant. Leave this `undefined` or `null` if this is a root node
+	 * @param origin - the immutable data store - Leave this `undefined` or `null` if this node is a descendant node
+	 * @returns - `inactive node` when no propertyPaths supplied; add `rootAtomNode` or `origin` to obtain `descendantAtom` or `rootAtom` nodes respectively.
+	 */
+	constructor(
+		head : AtomNode<T>,
+		fullPath : Array<string> = [],
+		rootAtomNode : AtomNode<T> = null, 
+		origin : T = null
+	) {
+		this._head = head;
+		if( !fullPath?.length ) { return }
+		this._isActiveNode = true;
+		this._fullPath = fullPath;
+		if( !rootAtomNode ) { // for creating a root node
+			this._sectionData = cloneDeep( get( origin, fullPath )._value );
+			for( let descNodes = this._findNearestDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
+				descNodes[ d ]._adjustToNewAtomNode( this );
+			}
+			this._rootAtomNode = this;
+		} else {
+			this._rootAtomNode = rootAtomNode;
+			this._pathToRootAtom = fullPath.slice( rootAtomNode.fullPath.length );
+		}
+	}
+	get branches() { return this._branches }
+	get fullPath() { return this._fullPath }
+	get hasBranches() { return this.numBranches }
+	get head() { return this._head }
+	get isActive() { return this._isActiveNode }
+	get numBranches() { return Object.keys( this._branches ).length }
+	get pathToRootAtom() { return this._pathToRootAtom }
+	get rootAtomNode() { return this._rootAtomNode }
+	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
+	@activeNodesOnly
+	get value() {
+		return this !== this._rootAtomNode
+			? get( this._rootAtomNode._sectionData, this._pathToRootAtom )._value
+			: this._sectionData;
+	}
+	/**
+	 * applicable only to nodes containing atoms: assert via a 
+	 * `this.isActive` check.
+	 * 
+	 * This value change propagates through descendant atoms. To
+	 * avoid redundant operations, it is advisable to call this
+	 * once on any node within a rootAtomNode section. 
+	 */
+	@activeNodesOnly
+	set value( v : Readonly<T> ) {
+		const previousRootAtomValue = shallowCopy( this._rootAtomNode.value ) as T;
+		if( this === this._rootAtomNode ) {
+			this._rootAtomNode.value = v;
+		} else {
+			makePathWriteable( this._rootAtomNode.value, this._pathToRootAtom, true );
+			set( this._rootAtomNode.value, this._pathToRootAtom, v );
+		}
+		this._retainUnchangedDescendants( previousRootAtomValue );
+	}
+
+	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
+	@activeNodesOnly
+	addAtomNodeAt( fullPath : Array<string>, origin : T ) {
+		if( isAPrefixOfB( this._fullPath, fullPath ) ) {
+			return this._addDescendantAtomNode( fullPath );
+		}
+		if( isAPrefixOfB( fullPath, this._fullPath ) ) {
+			return this._addRootAtomNode( fullPath, origin );
+		}
+		throw new Error( '`fullPath` argument must either be a prefix or suffix of the `fullPath` of this node.' );
+	}
+
+	/**
+	 * applicable only to nodes containing atoms: assert via a
+	 * `this.isActive` check.
+	 * 
+	 * @param fullPath - must be a prefix of this node's fullPath.
+	 */
+	@activeNodesOnly
+	removeAtomNodeAt( fullPath : Array<string> ) {
+		const nodeAtFullPath = this._findNodeAt( fullPath );
+		if( !nodeAtFullPath ) {
+			throw new Error( '`fullPath` argument must either be a prefix or suffix of the `fullPath` of this node.' );
+		}
+		if( !nodeAtFullPath._isActiveNode ) { return }
+		nodeAtFullPath.remove();
+	}
+
+	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
+	@activeNodesOnly
+	remove() {
+		const key = this._fullPath.at( -1 );
+		let head = this._head;
+		if( !this.hasBranches )	{
+			// handling leaf removal - discard all dangling leaf nodes.
+			let node = head;
+			delete node._branches[ key ];
+			if( node.hasBranches ) { return }
+			node = node._head;
+			while( node.numBranches === 1 ) {
+				node._branches = {};
+				if( node._isActiveNode ) { return }
+				node = node._head;
+			}
+			return;
+		}
+		head._branches[ key ] = new AtomNode( head );
+		head._branches[ key ]._branches = this._branches;
+		if( this === this._rootAtomNode ) {
+			for( let descNodes = head._branches[ key ]._findNearestDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
+				descNodes[ d ]._convertToRootAtomNode();
+			}
+		}
+	}
+	
+	/**
+	 * applicable only to nodes containing atoms: assert via a
+	 * `this.isActive` check.
+	 * 
+	 * This value change propagates through descendant atoms. To avoid redundant
+	 * operations, it is advisable to call this once on any node within a
+	 * rootAtomNode section.
+	 * @param fullPath - a path in node to set: must be a suffix of `this.fullPath`
+	 * @param value
+	 */
+	@activeNodesOnly
+	setValueAt( fullPath : Array<string>, value : Readonly<T> ) {
+		if( !isAPrefixOfB( this.fullPath, fullPath ) ) {
+			throw new Error( `Cannot use \`node.setValueAt(...)\` where \`fullPath: ${ fullPath }\` is a prefix of \`node.fullPath: ${ this.fullPath }\`.` );
+		}
+		const pathToRootAtom = fullPath.slice( this.rootAtomNode.fullPath.length );
+		let prevValue = this._rootAtomNode.value;
+		makePathWriteable( this._rootAtomNode.value, pathToRootAtom, true );
+		set( this._rootAtomNode.value, pathToRootAtom, value );
+		let closestChangedAtom : AtomNode<T> = this;
+		for( const key of fullPath.slice( this.fullPath.length ) ) {
+			if( !closestChangedAtom.branches?.[ key ]?.isActive ) { continue }
+			closestChangedAtom = closestChangedAtom.branches[ key ];
+		}
+		this._retainUnchangedDescendants( prevValue );
+	}
+
+	private _addDescendantAtomNode( fullPath : Array<string> ) {
+		let node = this.rootAtomNode;
+		for( let pathToRootAtom = fullPath.slice( this._fullPath.length ), ancestorLen =  pathToRootAtom.length - 1, p = 0; p < ancestorLen; p++ ) {
+			const key = pathToRootAtom[ p ];
+			if( !( key in node._branches ) ) {
+				node.branches[ key ] = new AtomNode<T>( node );
+			}
+			node = node._branches[ key ];
+		}
+		const key = fullPath.at( -1 );
+		if( key in node.branches ) { return }
+		node.branches[ key ] = new AtomNode<T>( node, fullPath, this._rootAtomNode );
+	}
+
+	private _addRootAtomNode( fullPath : Array<string>, origin : T ) {
+		let node = this._findNodeAt( fullPath );
+		const key = fullPath.at( -1 );
+		node._head._branches[ key ] = new AtomNode<T>(
+			node._head, fullPath, undefined, origin 
+		);
+		node._head._branches[ key ]._branches = node._branches;
+		node = node._head._branches[ key ];
+		for( let descNodes = this._findNearestDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
+			descNodes[ d ]._adjustToNewAtomNode( node );
+		}
+	}
+
+	private _adjustToNewAtomNode( rootAtomNode : AtomNode<T> ) {
+		this._rootAtomNode = rootAtomNode;
+		this._pathToRootAtom = this.fullPath.slice( rootAtomNode.fullPath.length );
+		if( !this._sectionData ) { return }
+		makePathWriteable( rootAtomNode._sectionData, this._pathToRootAtom, true );
+		set( rootAtomNode._sectionData, this._pathToRootAtom, this._sectionData );
+		this._sectionData = null;
+	}
+
+	private _convertToRootAtomNode() {
+		this._rootAtomNode = this;
+		this._pathToRootAtom = [];
+		for( let descNodes = this._findNearestDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
+			descNodes[ d ]._adjustToNewAtomNode( this );
+		}	
+	}
+
+	private _curateUnchangedAtoms( previouRootAtomValue : T ){
+		const rootAtomNode = this._rootAtomNode;
+		const nextRootAtomValue = rootAtomNode._sectionData;
+		const curatedNodes = new ArrayUnique<AtomNode<T>>();
+		( function areEqual( pVal : T, nVal : Readonly<T>, path : Array<string> ) {
+			const nLen = Object.keys( nVal ?? 0 ).length;
+			const pLen = Object.keys( pVal ?? 0 ).length;
+			if( !pLen || !nLen ) {
+				if( pVal !== nVal ) { return false }
+				curatedNodes.push( rootAtomNode._findClosestNodeTo( path ) );
+				return true;
+			}
+			let equal = true;
+			for( let k in nVal ) {
+				if( !areEqual(
+					pVal[ k ] as unknown as T,
+					nVal[ k ] as Readonly<T>,
+					[ ...path, k ]
+				) ) { equal = false }
+			}
+			if( !equal || nLen !== pLen ) { return false }
+			curatedNodes.push( rootAtomNode._findClosestNodeTo( path ) );
+			return true;
+		} )( previouRootAtomValue, nextRootAtomValue, [] );
+		return curatedNodes;
+	}
+
+	/**
+	 * produces the closest `atomNode` ancestor to the `propertyPath` tokens provided.
+	 */
+	private _findClosestNodeTo( fullPath : Array<string> ) : AtomNode<T> {
+		let rootAtomNode = this._rootAtomNode;
+		let closest = rootAtomNode;
+		for( const key of fullPath ) {
+			if( !rootAtomNode._isActiveNode ) {
+				rootAtomNode = rootAtomNode._branches[ key ];
+				continue;
+			}
+			if( isAPrefixOfB( rootAtomNode._fullPath, fullPath ) ) {
+				closest = rootAtomNode;
+				if( rootAtomNode._fullPath.length === fullPath.length ) {
+					return rootAtomNode;
+				}
+				rootAtomNode = rootAtomNode._branches[ key ];
+				continue;
+			} else if( isAPrefixOfB( fullPath, rootAtomNode._fullPath ) ) {
+				return closest;
+			}
+			if( !rootAtomNode.hasBranches ) { return null }
+			rootAtomNode = rootAtomNode._branches[ key ];
+		}
+		return null;
+	}
+
+	private _findDescendantAt( fullPath : Array<string> ) {
+		let node : AtomNode<T> = this;
+		for( let relPath = fullPath.slice( this._fullPath.length ), rLen = relPath.length, r = 0; r < rLen; r++ ) {
+			node = node.branches[ relPath[ r ] ];
+			if( !node ) { return null }
+		}
+		if( node === this ) { return null }
+		return node;
+	}
+
+	/**
+	 * produces the first occupied child or descendant
+	 * nodes containing `atomNode`s across breadth-wise.
+	 * @example
+	 * considering the following root node, an array of 
+	 * the asteriked nodes will be returned.
+	 * ...............1
+	 * ...............|    
+	 * .....---------------------
+	 * .....|         |         |
+	 * .....0         0         1*              
+	 * ..../ \       / \       / \
+	 * ...0   1*    0   1*    1   0
+	 * ............/               \
+	 * ...........1*                1
+	 */
+	private _findNearestDescendants() {
+		const nearestDescendants : Array<AtomNode<T>> = [];
+		( function searchDescendants( _node : AtomNode<T> ) {
+			for( const b in _node.branches ) {
+				_node.branches[ b ].isActive
+					? nearestDescendants.push( _node.branches[ b ] )
+					: searchDescendants( _node.branches[ b ] );
+			}
+		} )( this );
+		return nearestDescendants;
+	}
+
+	private _findNodeAt( fullPath : Array<string> ) {
+		const diffLen = this._fullPath.length - fullPath.length;
+		if( diffLen < 0 ) {
+			if( !isAPrefixOfB( this._fullPath, fullPath ) ) { return null }
+			return this._findDescendantAt( fullPath );
+		}
+		if( !isAPrefixOfB( fullPath, this._fullPath ) ) { return null }
+		if( !diffLen ) { return this }
+		let node : AtomNode<T> = this;
+		for( let p = diffLen; p--; ) { node = node._head }
+		return node;
+	}
+
+	private _retainUnchangedDescendants( previouRootAtomValue : T ) {
+		const taskArgs : Array<[ AtomNode<T>, Array<string> ]> = [];
+		for( let unchangedNodes = this._curateUnchangedAtoms( previouRootAtomValue ), uLen = unchangedNodes.length, u = 0; u < uLen; u++ ) {
+			const { pathToRootAtom, rootAtomNode } = unchangedNodes[ u ];
+			makePathWriteable( rootAtomNode._sectionData, pathToRootAtom, true );
+			set(
+				rootAtomNode._sectionData,
+				pathToRootAtom,
+				get( previouRootAtomValue, pathToRootAtom )._value
+			);
+			taskArgs.push([ rootAtomNode, pathToRootAtom ]);
+		}
+		while( taskArgs.length ) {
+			const args = taskArgs.pop();
+			makePathReadonly( args[ 0 ]._sectionData, args[ 1 ] );
+		}
+	}
+}
+
+class AtomValueRepository<T extends Value = Value> {
+	private _data = new AtomNode<T>( null );
 	private _origin : T;
 	constructor( origin : T ) { this._origin = origin }
 	get origin() { return this._origin }
@@ -264,29 +462,20 @@ class AtomValueRepository<T extends Value> {
 	) : void; 
 	addDataForAtomAt( propertyPath ) : void {
 		const tokens = tokenizeStringByDots( propertyPath );
-		let rootAtomNode : DescendantNode<T>;
-		let counter = 0;
-		let currNode = this._data as DescendantNode<T>;
-		while( counter < tokens.length ) {
-			const currKey = tokens[ counter ];
-			if( !( currKey in currNode.entries ) ) {
-				currNode.entries[ currKey ] = {
-					entries: {},
-					head: currNode
-				};
-			} else if( !rootAtomNode && 'value' in currNode ) {
-				rootAtomNode = currNode as DescendantNode<T>;
+		let node = this._data;
+		for( let tLen = tokens.length - 1, t = 0; t < tLen; t++ ) {
+			const key = tokens[ t ];
+			if( key in node.branches ) {
+				node = node.branches[ key ]
+				if( !node.isActive ) { continue }
+				return node.addAtomNodeAt( tokens, this._origin );
 			}
-			currNode = currNode.entries[ currKey ];
-			counter++;
+			node.branches[ key ] = new AtomNode<T>( node );
+			node = node.branches[ key ];
 		}
-		currNode.fullPath = tokens;
-		if( !Object.keys( currNode.entries ).length ) {
-			delete currNode.entries;
-		}
-		rootAtomNode
-			? this.addDescendantAtomData( currNode as DescendantNode<T>, rootAtomNode )
-			: this.addRootAtomData( currNode as DescendantNode<T> );
+		node.branches[ tokens.at( -1 ) ] = new AtomNode<T>(
+			node, propertyPath, undefined, this._origin
+		);
 	}
 	
 	getOriginValueAt( propertyPath : string ) : PropertyOriginInfo;
@@ -305,350 +494,78 @@ class AtomValueRepository<T extends Value> {
 		changes : Readonly<ChangeInfo["changes"]>,
 		paths : Readonly<ChangeInfo["paths"]>
 	) {
-		let changedNodeInfoSet = new AtomChangeInfoSet();
-		// let changedNodeInfoList : Array<AtomChangeInfo> = [];
-		/* locate all atom nodes affected by changes */
-		for( const tokens of paths ) {
-			const changedNodeInfo = createAtomChangeInfo();
-			const node = this._data as DescendantNode<Value>;
-			while( 'entries' in node ) {
-				for( const e in node.entries ) {
-					const entryNode = node.entries[ e ] as DescendantNode<Value>;
-					const entryPathTokens = entryNode.fullPath;
-					if( isAPrefixOfB( entryPathTokens, tokens ) ) {
-						changedNodeInfoSet.add((
-							function verifyAtomNode( _node, _changedPathTokens ) {
-								for( const _e in _node.entries ) {
-									const _entryNode = _node.entries[ e ] as DescendantNode<Value>;
-									const _entryPathTokens = _entryNode.fullPath;
-									if( isAPrefixOfB( _changedPathTokens, _entryPathTokens ) ) {
-										if( _changedPathTokens.length === _entryPathTokens.length ) {
-											return createAtomChangeInfo( _entryNode, _changedPathTokens );
-										}
-									} else if( isAPrefixOfB( _entryPathTokens, _changedPathTokens ) ) {
-										return verifyAtomNode( _entryNode, _changedPathTokens );
-									}
-								}
-								return createAtomChangeInfo( _node, _changedPathTokens );
-							}
-						)( entryNode, tokens ));
-					} else if( isAPrefixOfB( tokens, entryPathTokens ) ) {
-						changedNodeInfo.atomRepoNode = entryNode;
-						changedNodeInfo.incomingChangePath = tokens;
-						changedNodeInfoSet.add({ ...changedNodeInfo });
-						if( tokens.length === entryPathTokens.length ) {
-							break;
-						}
+		const rootAtomChangeMap = new Map<AtomNode<T>, Array<string>>();
+		for( let p = paths.length; p--; ) {
+			const tokens = paths[ p ];
+			let node = this._data;
+			let isApplicable = true;
+			for( let tLen = tokens.length, t = 0; t < tLen; t++ ) {
+				node  = node.branches[ tokens[ t ] ];
+				if( !node ) {
+					isApplicable = false;
+					break;
+				}
+				if( node.isActive ) {
+					const exPath = rootAtomChangeMap.get( node );
+					if( !exPath ) {
+						rootAtomChangeMap.set( node, tokens );
+						break;
 					}
+					isAPrefixOfB( tokens, exPath ) &&
+					tokens.length !== exPath.length	&&
+					rootAtomChangeMap.set( node, tokens );
+					break;
 				}
 			}
-		}
-
-
-		const changedNodeInfoList = changedNodeInfoSet.list();
-
-		for( let cLen = changedNodeInfoList.length, c = 0; c < cLen; c++ ) {
-			const { incomingChangePath, atomRepoNode } = changedNodeInfoList[ c ]
-			const rootAtomNode = this.findRootAtomNodeFor( atomRepoNode as DescendantNode<T> );
-			makePathWriteable( rootAtomNode.value, atomRepoNode.fullPath );
-			const nodePath = atomRepoNode.fullPath;
-			if( incomingChangePath.length > nodePath.length ) {
-				/* CASE: changed path points to a subset of an atom node. */
-				// nodePath: a.b.c.d
-				// changePath: a.b.c.d.e.0.w.e
-				let atomValue = get( atomRepoNode.value, nodePath.slice( rootAtomNode.fullPath.length ) );
-				for( let i = nodePath.length; i < incomingChangePath.length; i++ ) {
-					// @ts-expect-error
-					atomValue = shallowCopy( atomValue );
-					if( atomValue === undefined ) { break }
-					atomValue = atomValue[ incomingChangePath[ i ] ];
+			if( !isApplicable ) { continue }
+			( function tryDescActiveNodeAt<T extends Value>( _node : AtomNode<T> ) {
+				for( let b in node.branches ) {
+					const _node = node.branches[ b ];
+					_node.isActive
+						? rootAtomChangeMap.set( _node, _node.fullPath )
+						: tryDescActiveNodeAt( _node );
 				}
-				set(
-					atomRepoNode.value,
-					incomingChangePath,
-					get( changes, incomingChangePath )._value
-				);
-			} else {
-				/* CASE: changed path points to a superset of an atom node. */
-				// nodePath: a.b.c.d.e.0.w.e
-				// changePath: a.b.c.d[.e.0.w.e]
-				set(
-					atomRepoNode.value,
-					atomRepoNode.fullPath,
-					get( changes, atomRepoNode.fullPath )._value
-				);
-			}
+			} )( node );
 		}
-
-		// --- move salvageables from below linie into above --- //
-
-		for( const {
-			incomingChangePath,
-			atomRepoNode
-		} of changedNodeInfoList ) {
-
+		for( const [ rootAtomNode, fullPath ] of rootAtomChangeMap ) {
+			rootAtomNode.setValueAt( fullPath, get( changes, fullPath )._value );
 		}
-
-		let hasClearedLeaves = false;
-		let headInfoSet = new AtomChangeInfoSet();
-		while( changedNodeInfoSet.size ) {
-			for( const {
-				incomingChangePath,
-				atomRepoNode
-			} of changedNodeInfoSet.list() ) {
-				const changePathLen = incomingChangePath.length;
-				const nodePathLen = atomRepoNode.fullPath.length;
-				const prevValue = atomRepoNode.value;
-				if( changePathLen > nodePathLen ) {
-					/* CASE: changed path points to a subset of an atom node. */
-					// nodePath: a.b.c.d
-					// changePath: a.b.c.d.e.0.w.e
-					set(
-						atomRepoNode.value,
-						incomingChangePath,
-						get( changes, incomingChangePath )._value
-					);
-				} else {
-					/* CASE: changed path points to a superset of an atom node. */
-					// nodePath: a.b.c.d.e.0.w.e
-					// changePath: a.b.c.d[.e.0.w.e]
-					set(
-						atomRepoNode.value,
-						atomRepoNode.fullPath,
-						get( changes, atomRepoNode.fullPath )._value
-					);
-				}
-				if( atomRepoNode.head && 'value' in atomRepoNode.head ) {
-					// roll into ancestors values -> { ... }
-					const headValue = shallowCopy( atomRepoNode.head.value );
-					set( headValue, incomingChangePath, atomRepoNode.value );
-					atomRepoNode.head.value = headValue;
-				}
-				if( !hasClearedLeaves ) {
-					// set descendant atoms values to properties in new `node`.value
-					const descendantNodes : Array<DescendantNode<Value>> = [];
-					const rootNode = this._data;
-					( function identifyAffectedDescNodes( data, oldData, currPath ) {
-						if( !Object.keys( oldData ).length || (
-							Array.isArray( oldData ) && !oldData.length
-						) ) {
-							data !== oldData && collectDistinctClosestNodes( rootNode, currPath, descendantNodes );
-							return;
-						}
-						if( Array.isArray( oldData ) ) {
-							for( let iLen = oldData.length, i = 0; i < iLen; i++ ) {
-								const thisCurrPath = [ ...currPath, `${ i }` ];
-								identifyAffectedDescNodes( data?.[ i ] as Readonly<T>, oldData[ i ] as Readonly<T>, thisCurrPath );
-								data?.[ i ] !== oldData[ i ] && collectDistinctClosestNodes( rootNode, thisCurrPath, descendantNodes );
-							}
-							return;
-						}
-						for( const k in oldData ) {
-							const thisCurrPath = [ ...currPath, k ];
-							identifyAffectedDescNodes( data?.[ k ] as Readonly<T>, oldData[ k ] as Readonly<T>, thisCurrPath );
-							data?.[ k ] !== oldData[ k ] && collectDistinctClosestNodes( rootNode, thisCurrPath, descendantNodes );
-						}
-					} )( atomRepoNode.value, prevValue, atomRepoNode.fullPath );
-					for( let dLen = descendantNodes.length, d = 0; d > dLen; d++ ) {
-						descendantNodes[ d ].value = get(
-							atomRepoNode.value,
-							descendantNodes[ d ].fullPath
-						)._value;
-					}
-					hasClearedLeaves = true;
-				}
-				headInfoSet.add( createAtomChangeInfo(
-					atomRepoNode.head,
-					atomRepoNode.fullPath.slice( 0, -1 )
-				) );
-			}
-			changedNodeInfoSet = headInfoSet;
-			headInfoSet = new AtomChangeInfoSet();
-		}
-
-		// @todo : continue here...
-		// 1. traverse changeInfoList:
-		// 2. if `paths`.length > `nPaths`.length ( `paths` points to a subset of atom node)
-		//		a. set `node`.value to `changes`.value at `paths`
-		//		b. roll into ancestors values -> { ... }
-		//		c. set descendant atom values to properties in new `node`.value
-		//		d. reconcile the ancestral branches up the tree
-		// 		e. return untouched siblings across the tree
-		// 		f. return untouched descendants below the atom
-		// 3. if `paths`.length < `nPaths`.length ( `paths` points to a superset of atom node)
-		//		a. set `node`.value to `changes`.value at `paths`
-		//		b.0. if( higher ancestor atoms ) set its affected value property to `changes`.value
-		//		b.1. roll the last upper change into higher ancestors values -> { ... }
-		//		c. set descendant atom values to properties in new `node`.value
-		//		d. reconcile the ancestral branches up the tree
-		// 		e. return untouched siblings across the tree
-		// 		f. return untouched descendants below the atom
-		// 4. if `paths`.length === `nPaths`.length ( `paths` points to an exact atom node)
-		//		a. set `node`.value to `changes`.value at `paths`
-		//		b. roll into ancestors values -> { ... }
-		//		c. set descendant atom values to properties in new `node`.value
-		//		d. reconcile the ancestral branches up the tree
-		// 		e. return untouched siblings across the tree
-		// 		f. return untouched descendants below the atom
-
-
-
 	}
 	
 	removeAtomDataAt( propertyPath : string ) : void;
 	removeAtomDataAt(
 		/* split property path string */
 		propertyPath : Array<string>
-	) : void; 
+	) : void;
 	removeAtomDataAt( propertyPath ) : void {
-		let node = this.atomNodeAt( propertyPath );
-		if( !node ) { return }
-		// if there are descendants of this node simply excuse
-		// this node and leave the descendants undisturbed.
-		if( 'entries' in node ) {
-			delete node.fullPath;
-			delete node.pathToRootAtom;
-			delete node.value;
-			const rootAtomNode = this.findRootAtomNodeFor( node );
-			if( !rootAtomNode ) { return }
-			// @todo : recalculate `pathToRootAtom` fields for all descendant atoms.
-			return;
+		const tokens = tokenizeStringByDots( propertyPath );
+		let node = this._data;
+		for( let tLen = tokens.length - 1, t = 0; t < tLen; t++ ) {
+			const key = tokens[ t ];
+			if( !( key in node.branches[ key ] ) ) { return }
+			node = node.branches[ key ];
+			if( node.isActive ) { return node.removeAtomNodeAt( tokens ) }
 		}
-		/* if leaf, clean up all associated precendent atomless branches */
-		const pathToRootAtom = ( node as DescendantNode<T> ).pathToRootAtom.slice();
-		while( pathToRootAtom.length ) {
-			node = node.head;
-			const key = pathToRootAtom.pop();
-			if( Object.keys( node.entries ).length > 1 ) {
-				delete node.entries[ key ];
-			} else {
-				delete node.entries;
+		( function tryDescActiveNodeAt<T extends Value>( _node : AtomNode<T> ) {
+			if( _node.isActive ) {
+				return _node.removeAtomNodeAt( tokens )
 			}
-		}
-
-	}
-
-	private addRootAtomData( entryNode : DescendantNode<T> ) {
-		entryNode.value = clonedeep( getProperty( this.origin, entryNode.fullPath )?._value );
-		carryoverDescendantValuesInto( entryNode );
-		entryNode.value = makeReadonly( entryNode.value );
-	}
-	private addDescendantAtomData(
-		entryNode : DescendantNode<T>,
-		rootAtomNode : DescendantNode<T>
-	) {
-		entryNode.pathToRootAtom = entryNode.fullPath.slice( rootAtomNode.fullPath.length );
-		entryNode.value = get( rootAtomNode.value, entryNode.pathToRootAtom )._value;
-	}
-	private findRootAtomNodeFor( node : DescendantNode<T> ) : DescendantNode<T> {
-		node = node.head;
-		if( node ) {
-			const head = node.head;
-			if( !head ) { return node }
-			node = head;
-		}
-		return node;
-	}
-
-	private atomNodeAt( propertyPath : string ) : DescendantNode<T>;
-	private atomNodeAt(
-		/* split property path string */
-		propertyPath : Array<string>
-	) : DescendantNode<T>; 
-	private atomNodeAt( propertyPath ) : DescendantNode<T> {
-		let node = this._data as DescendantNode<T>;
-		for( let tokens = tokenizeStringByDots( propertyPath ), tLen = tokens.length, t = 0; t < tLen; t++ ){
-			node = node.entries?.[ tokens[ t ] ];
-			/* if not found, abandon removal operation */
-			if( !node ) { return }
-		}
-		return node;
-	}
-}
-
-function carryoverDescendantValuesInto<T extends Value>( node : DescendantNode<T> ) {
-	const nearestDescendants = findNearestDescendantsFrom( node );
-	if( !nearestDescendants.length ) {
-		delete node.entries;
-	} else {
-		const relPathStartIndex = node.fullPath.length;
-		for( let n = nearestDescendants.length; n--; ) {
-			const nDesc = nearestDescendants[ n ];
-			nDesc.pathToRootAtom = nDesc.fullPath.slice( relPathStartIndex );
-			set( node.value, nDesc.pathToRootAtom, nDesc.value );
-		}
-	}
-}
-
-function collectDistinctClosestNodes<T extends Value>(
-	rootNode : AtomDataEntryNode<T>,
-	currentPath : Array<string>,
-	distinctNodes : Array<AtomDataEntryNode<T>> // output: a runninig over collected distinct closes nodes
-) {
-	const atomNode = findClosestNodeTo( currentPath, rootNode as DescendantNode<T> );
-	!containsNode(
-		distinctNodes as Array<DescendantNode<Value>>,
-		atomNode as DescendantNode<Value>
-	) &&
-	distinctNodes.push( atomNode );
-}
-
-function containsNode<T extends Value>(
-	hayStack : Array<DescendantNode<T>>,
-	needle : DescendantNode<T>
-) {
-	for( const node of hayStack ) {
-		if( node === needle ) { return true }
-	}
-	return false;
-}
-
-function createAtomChangeInfo(
-	node: DescendantNode<Value> = null,
-	referencedChangePathTokens: Array<string> = []
-) : AtomChangeInfo{
-	return {
-		atomRepoNode: node,
-		incomingChangePath: referencedChangePathTokens
-	};
-}
-
-function findClosestNodeTo<T extends Value>(
-	propertyPathTokens : Array<string>,
-	rootNode : DescendantNode<T>
-) : AtomDataEntryNode<T> {
-	let closest : AtomDataEntryNode<T> = rootNode;
-	for( const key of propertyPathTokens ) {
-		if( !( 'fullPath' in rootNode ) ) {
-			rootNode = rootNode[ key ];
-			continue;
-		}
-		if( isAPrefixOfB( rootNode.fullPath, propertyPathTokens ) ) {
-			closest = rootNode;
-			if( rootNode.fullPath.length === propertyPathTokens.length ) {
-				return rootNode;
+			for( let b in node.branches ) {
+				tryDescActiveNodeAt( node.branches[ b ] )
 			}
-			rootNode = rootNode[ key ];
-			continue;
-		} else if( isAPrefixOfB( propertyPathTokens, rootNode.fullPath ) ) {
-			return closest;
-		}
-		if( 'entries' in rootNode ) { return null }
-		rootNode = rootNode[ key ];
+		} )( node );
 	}
-	return null;
 }
 
-function findNearestDescendantsFrom<T extends Value>( rootNode : DescendantNode<T> ) {
-	const nearestDescendants : Array<DescendantNode<T>> = [];
-	for( let numEntries = Object.keys( rootNode.entries ).length, e = 0; e < numEntries; e++ ) {
-		if( 'value' in rootNode.entries[ e ] ) {
-			nearestDescendants.push( rootNode.entries[ e ]);
-			continue;
+function activeNodesOnly<C>( method: Function, context: C ) {
+    return function ( this: AtomNode<any>, ...args: Array<any> ) {
+        if( !this.isActive ) {
+			throw new Error(
+				'applicable only to nodes containing atoms: assert via a `this.isActive` check.'
+			);
 		}
-		nearestDescendants.push( ...findNearestDescendantsFrom( rootNode.entries[ e ] ) );
-	}
-	return nearestDescendants;
+        return method.apply( this, args );
+    };
 }
 
 function isAPrefixOfB<T>(
@@ -662,43 +579,31 @@ function isAPrefixOfB<T>(
 	return true;
 }
 
-function searchNodeInfoListByPath(
-	path : Array<string>,
-	nodeInfoList : Array<AtomChangeInfo>
-) {
-	const pLen = path.length;
-	for( let n = nodeInfoList.length; n--; ) {
-		const nodeInfo = nodeInfoList[ n ];
-		if( nodeInfo[ n ].length !== pLen ) { continue }
-		let found = true;
-		for( let p = 0; p < pLen; p++ ) {
-			if( nodeInfo.incomingChangePath[ p ] !== path[ p ] ) {
-				found = false; 
-				break;
-			}
-		}
-		if( found ) { return nodeInfo }
-	}
-}
-
 /** makes path in `source` readonly */
 function makePathReadonly<T extends Value>(
-	source : T, path : Array<string>
+	source : T,
+	path : Array<string>,
+	endAtClosestReadonlyAncestor = false
  ) {
 	let { _value : data, exists } = get( source, path );
-	if( exists ) { return }
+	if( !exists ) { return }
 	for( let p = path.length; p--; ) {
 		data = data[ path[ p ] ];
-		!Object.isFrozen( data ) &&
-		Object.freeze( data );
+		if( !Object.isFrozen( data ) ) {
+			Object.freeze( data );
+			continue;
+		}
+		if( endAtClosestReadonlyAncestor ) { return }
 	}
 }
 
 function makePathWriteable<T extends Value>(
-	source : T, path : Array<string>
+	source : T,
+	path : Array<string>,
+	startAtClosestWriteableAncestor = false
  ) {
 	let { _value : target, exists } = get( source, path );
-	if( exists ) { return }
+	if( !exists ) { return }
 	if( Object.isFrozen( source ) ) {
 		source = shallowCopy( source ) as T
 	}
@@ -707,7 +612,7 @@ function makePathWriteable<T extends Value>(
 		const key = path[ ++p ];
 		if( Object.isFrozen( source[ key ] ) ) {
 			source[ key ] = shallowCopy( source[ key ] );
-		}
+		} else if( startAtClosestWriteableAncestor ) { return }
 		source = source[ key ] as T;
 	} 
 }
