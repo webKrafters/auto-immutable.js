@@ -47,15 +47,11 @@ export function isDataContainer( v ) : boolean { return isPlainObject( v ) || Ar
  * Note: Mutates original argument.
  */
 export function makeReadonly<T>( v : T ) : Readonly<T> {
-	let frozen = true;
-	if( isPlainObject( v ) ) {
+	try {
 		for( const k in v ) { makeReadonly( v[ k ] ) }
-		frozen = Object.isFrozen( v );
-	} else if( Array.isArray( v ) ) {
-		const vLen = v.length;
-		for( let i = 0; i < vLen; i++ ) { makeReadonly( v[ i ] ) }
-		frozen = Object.isFrozen( v );
+	} catch( e ) {
+	} finally {
+		Object.freeze( v );
+		return v;
 	}
-	!frozen && Object.freeze( v );
-	return v;
 };
