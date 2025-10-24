@@ -1,33 +1,38 @@
-import type { AccessorPayload, AccessorResponse } from '../..';
+import type {
+	AccessorPayload,
+	AccessorResponse,
+	Value
+} from '../..';
 
-import type Atom from '../atom';
+import { DELIMITER } from '../../constants';
 
-const MODERATE_NUM_PATHS_THRESHOLD = 8;
+import type AtomNode from '../accessor-cache/repository/atom-value/node';
+import PathRepository from '../accessor-cache/repository/paths';
 
-class Accessor {
+class Accessor <T extends Value> {
 
 	private static _NUM_INSTANCES = 0;
 
-	private _clients : Set<string>;
+	private _clients = new Set<string>();
 	private _id : number;
-	private _paths : Array<string>;
-	private _value : AccessorResponse;
+	private _pathRepo : PathRepository;
+	private _sourcePathIds : Array<number>;
+	private _value : AccessorResponse<T> = {};
 
-	public outdatedPaths : Array<string>;
-
-	constructor( accessedPropertyPaths : Array<string> ) {
-		this._clients = new Set();
+	constructor(
+		sourcePathIds : Array<number>,
+		pathRepo : PathRepository
+	) {
 		this._id = ++Accessor._NUM_INSTANCES;
-		this._paths = Array.from( new Set( accessedPropertyPaths ) );
-		this.outdatedPaths = this._paths.slice();
-		this._value = {};
+		this._sourcePathIds = sourcePathIds;
+		this._pathRepo = pathRepo;
 	}
 
 	get numClients() { return this._clients.size }
 
 	get id() { return this._id }
 
-	get paths() { return this._paths }
+	get sourcePathIds() { return this._sourcePathIds }
 
 	get value() { return this._value }
 
@@ -37,50 +42,34 @@ class Accessor {
 
 	removeClient( clientId : string ) : boolean { return this._clients.delete( clientId ) }
 	
-	/** @param atoms - Curated slices of value object currently requested */
-	refreshValue( atoms : AccessorPayload ) : AccessorResponse {
-		// istanbul ignore next
-		if( !this.outdatedPaths.length ) { return this._value }
-		let refreshLen;
-		const refreshPaths = {};
-		BUILD_REFRESH_OBJ: {
-			const pathSet = new Set( this.outdatedPaths );
-			this.outdatedPaths = [];
-			refreshLen = pathSet.size;
-			for( const p of pathSet ) { refreshPaths[ p ] = true }
+	/** @param changedAtomNodes - Curated slices of value object currently requested */
+	refreshValue( changedAtomNodes : AccessorPayload<T> ) : AccessorResponse<T> {
+		const { length : sLen, ...sourcePathIds } = this._sourcePathIds;
+		const maxVisits = Math.max(
+			Object.keys( changedAtomNodes ).length,
+			sLen
+		);
+		for( let numVisists = 0, s = 0; s < sLen; s++ ){
+			const pathId = sourcePathIds[ s ];
+			if( !( pathId in changedAtomNodes ) ) { continue }
+			this.setValueAt(
+				this._pathRepo.getSanitizedPathOf( pathId ),
+				changedAtomNodes[ pathId ]
+			);
+			if( ++numVisists === maxVisits ) { break }
 		}
-		if( refreshLen >= this._paths.length ) {
-			for( const p of this._paths ) {
-				p in refreshPaths && this.setValueAt( p, atoms[ p ] );
-			}
-			return this._value;
-		}
-		if( this._paths.length > MODERATE_NUM_PATHS_THRESHOLD ) {
-			const pathsObj = {};
-			for( const p of this._paths ) { pathsObj[ p ] = true }
-			for( const p in refreshPaths ) {
-				p in pathsObj && this.setValueAt( p, atoms[ p ] );
-			}
-			return this._value;
-		}
-		// istanbul ignore next
-		for( const p in refreshPaths ) {
-			// istanbul ignore next
-			this._paths.includes( p ) &&
-			this.setValueAt( p, atoms[ p ] );
-		}
-		// istanbul ignore next
 		return this._value;
 	}
 
-	private setValueAt<V>(
+	private setValueAt(
 		propertyPath : string,
-		atom : Atom<V>
+		atomNode : AtomNode<T>
 	) {
-		if( !atom ) { return }
+		if( !atomNode.isActive ) { return }
+		const { atom } = atomNode;
 		!atom.isConnected( this._id ) &&
 		atom.connect( this._id );
-		this._value[ propertyPath ] = atom.value;
+		this._value[ propertyPath ] = atomNode.value;
 	}
 }
 

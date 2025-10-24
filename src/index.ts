@@ -14,6 +14,8 @@ import {
 
 import { Immutable, Tag } from './main';
 
+import type AtomNode from './model/accessor-cache/repository/atom-value/node';
+
 /** @see {@link https://auto-immutable.js.org/api/set/method/tags/clear-usage} */
 export type ClearTag = typeof CLEAR_TAG;
 
@@ -95,9 +97,17 @@ export type TagCommand<T extends TagType, P extends Value|Array<any> = Value> =
 	T extends SetTag ? SetCommand :
 	T extends SpliceTag ? SpliceCommand : never;
 
-export interface AccessorPayload {[ propertyPath: string ]: Atom};
+/** @todo discard */
+// export interface AccessorPayload {[ propertyPath: string ]: Atom};
+export interface AccessorPayload<T extends Value>{
+    [ sourcePathId: number ]: AtomNode<T>;
+};
 
-export interface AccessorResponse {[ propertyPath: string ]: Atom["value"]}; // [Readonly<any>};
+/** @todo discard */
+// export interface AccessorResponse {[ propertyPath: string ]: Atom["value"]}; // [Readonly<any>};
+export interface AccessorResponse<T extends Value>{
+    [ sourcePath: string ]: Readonly<T>;
+};
 
 export type Changes<T extends Value> = UpdatePayload<T> | UpdatePayloadArray<T>;
 
