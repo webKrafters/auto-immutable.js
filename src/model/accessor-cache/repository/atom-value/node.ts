@@ -66,11 +66,9 @@ class AtomNode<T extends Value>{
 		}
 		this._rootAtomNode = this;
 	}
-	get atom() { return this._atom }
 	get branches() { return this._branches }
 	get fullPath() { return this._fullPathRepo.getPathTokensAt( this._fullPathId ) }
-	get hasBranches() { return this.numBranches }
-	get head() { return this._head }
+	get hasBranches() { return this.numBranches > 0 }
 	get isActive() { return !!this._atom }
 	get numBranches() { return Object.keys( this._branches ).length }
 	get pathToRootAtom() { return this._pathToRootAtom }
@@ -104,6 +102,15 @@ class AtomNode<T extends Value>{
 		this._retainUnchangedDescendants( previousRootAtomValue );
 	}
 
+	/**
+	 * applicable only to nodes containing atoms: assert via a `this.isActive` check.
+	 * @returns {number} Number of accessors remaining 
+	 */
+	@activeNodesOnly
+	addAccessor( accessorId : number ) : number {
+		return this._atom.connect( accessorId );
+	}
+
 	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
 	@activeNodesOnly
 	addAtomNodeAt( fullPath : Array<string>, origin : T ) {
@@ -124,19 +131,12 @@ class AtomNode<T extends Value>{
 	}
 
 	/**
-	 * applicable only to nodes containing atoms: assert via a
-	 * `this.isActive` check.
-	 * 
-	 * @param fullPath - must be a prefix of this node's fullPath.
+	 * applicable only to nodes containing atoms: assert via a `this.isActive` check.
+	 * @returns {number} Number of accessors remaining 
 	 */
 	@activeNodesOnly
-	removeAtomNodeAt( fullPath : Array<string> ) {
-		const nodeAtFullPath = this._findNodeAt( fullPath );
-		if( !nodeAtFullPath ) {
-			throw new Error( '`fullPath` argument must either be a prefix or suffix of the `fullPath` of this node.' );
-		}
-		if( !nodeAtFullPath.isActive ) { return }
-		nodeAtFullPath.remove();
+	removeAccessor( accessorId : number ) : number {
+		return this._atom.disconnect( accessorId );
 	}
 
 	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */

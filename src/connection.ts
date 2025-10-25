@@ -43,15 +43,14 @@ export class Connection<T extends Value> {
     }
 
     get disconnected() {
-        if( this._source ) {
-            if( this._source?.map.get( this._source.key ) instanceof AccessorCache ) {
-                return false;
-            }
-            // addresses eventual gc collection of source immutable when not
-            // properly disposed. (i.e. w/o calling Immutable.close(...) prior)
-            // istanbul ignore next
-            this._source = undefined;
+        if( !this._source ) { return true }
+        if( this._source?.map.get( this._source.key ) instanceof AccessorCache ) {
+            return false;
         }
+        // addresses eventual gc collection of source immutable when not
+        // properly disposed. (i.e. w/o calling Immutable.close(...) prior)
+        // istanbul ignore next
+        this._source = undefined;
         return true;
     }
     

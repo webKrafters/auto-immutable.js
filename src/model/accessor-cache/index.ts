@@ -7,11 +7,11 @@ import {
 
 import isEmpty from 'lodash.isempty';
 
-import { DELIMITER, GLOBAL_SELECTOR } from '../../constants';
+import { GLOBAL_SELECTOR } from '../../constants';
 
 import Accessor from '../accessor';
 
-import PathRepository, { PathIdInfo } from './repository/paths';
+import PathRepository from './repository/paths';
 import AtomValueRepository from './repository/atom-value';
 
 class Sorted extends Array<number> {
@@ -31,12 +31,15 @@ class Sorted extends Array<number> {
 }
 
 class AccessorCache<T extends Value> {
+
 	private _accessors : { [ cacheKey : string ]: Accessor<T> } = {};
+
+	/** A map of { source path id : Atom Value Node } */
 	private _atoms : AccessorPayload<T> = {};
 
-	private _valueRepo : AtomValueRepository<T>;
+	private _pathRepo = new PathRepository()
 
-	private _pathRepo = new PathRepository();
+	private _valueRepo : AtomValueRepository<T>;;
 
 	/** @param origin - Value object reference from which slices stored in this cache are to be curated */
 	constructor( origin : T ) {
@@ -57,61 +60,48 @@ class AccessorCache<T extends Value> {
 
 	/**
 	 * Gets value object slice from the cache matching the `propertyPaths`.\
-	 * If not found, creates a new entry for the client from source, and returns it.
+	 * If not found, creates a new entry for the client from source, and \
+	 * returns it.
 	 */
 	get(
 		clientId : string,
 		...propertyPaths : Array<string>
 	) : AccessorResponse<T> {
 		if( isEmpty( propertyPaths ) ) { propertyPaths = [ GLOBAL_SELECTOR ] }
-		const pathIds = new Sorted();
-		for( let pLen = propertyPaths.length, p = 0; p < pLen; p++ ) {
-			pathIds.push( this._pathRepo.getPathInfoAt( propertyPaths[ p ] ).sourcePathId );
+		const pathIds = this._toSourcePathIds( propertyPaths );
+		const cacheKey = pathIds.join( ':' );
+		if( !( cacheKey in this._accessors ) ) {
+			this._accessors[ cacheKey ] = new Accessor<T>(
+				pathIds,
+				this._atoms,
+				this._pathRepo,
+				this._valueRepo
+			);
 		}
-		const cacheKey = pathIds.join( DELIMITER );
-		const accessor = cacheKey in this._accessors
-			? this._accessors[ cacheKey ]
-			: this.createAccessor( cacheKey, [ ...pathIds ] );
-		!accessor.hasClient( clientId ) && accessor.addClient( clientId );
-		return accessor.refreshValue( this._atoms );
+		const accessor =  this._accessors[ cacheKey ];
+		accessor.addClient( clientId );
+		return accessor.value;
 	}
 
-	/** Unlinks a consumer from the cache: performing synchronized value cleanup */
+	/**
+	 * Unlinks a consumer from the cache: performing synchronized value \
+	 * cleanup
+	 */
 	unlinkClient( clientId : string ) {
 		const accessors = this._accessors;
-		const atoms = this._atoms;
 		for( const cacheKey in accessors ) {
-			const accessor = accessors[ cacheKey ];
-			// istanbul ignore next
-			if( !accessor.removeClient( clientId ) || accessor.numClients ) { continue }
-			for( const pathId of accessor.sourcePathIds ) {
-				if( pathId in atoms && atoms[ pathId ].atom.disconnect( accessor.id ) < 1 ) {
-					atoms[ pathId ].remove();
-					delete atoms[ pathId ];
-				}
-			}
+			accessors[ cacheKey ].removeClient( clientId );
 			delete accessors[ cacheKey ];
 		}
 	}
 
-	/** Add new cache entry */
-	private createAccessor(
-		cacheKey : string, sourcePathIds : Array<number>
-	) : Accessor<T> {
-		const atoms = this._atoms;
-		const accessor = new Accessor<T>( sourcePathIds, this._pathRepo );
-		this._accessors[ cacheKey ] = accessor;
-		for( const pathId of accessor.sourcePathIds ) {
-			if( pathId in atoms ) { continue }
-			const path =  this._pathRepo.getSanitizedPathOf( pathId );
-			this._valueRepo.addDataForAtomAt( path );
-			this._atoms[ pathId ] = this._valueRepo.getAtomAt( path );
+	private _toSourcePathIds( propertyPaths : Array<string> ) {
+		const pathIds = new Sorted();
+		const pathRepo = this._pathRepo;
+		for( let pLen = propertyPaths.length, p = 0; p < pLen; p++ ) {
+			pathIds.push( pathRepo.getPathInfoAt( propertyPaths[ p ] ).sourcePathId );
 		}
-		return this._accessors[ cacheKey ];
-	}
-
-	getOriginAt( propertyPath : string ) {
-		return this._valueRepo.getOriginValueAt( propertyPath );
+		return [ ...pathIds ];
 	}
 }
 

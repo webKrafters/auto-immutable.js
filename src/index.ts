@@ -139,8 +139,6 @@ export type UpdatePayloadArrayCore<T extends Array<any>|Value> = Array<UpdatePay
 export type UpdatePayloadArrayCoreCloneable<T extends Array<any>|Value> = Cloneable<UpdatePayloadArrayCore<T>>;
 export type UpdatePayloadArray<T extends Array<any> | Value> = UpdatePayloadArrayCore<T>|UpdatePayloadArrayCoreCloneable<T>;
 
-import type Atom from './model/atom';
-
 export type { Connection } from './connection';
 
 export type { Closable, TagType };

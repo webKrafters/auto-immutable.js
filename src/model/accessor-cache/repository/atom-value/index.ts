@@ -56,7 +56,9 @@ class AtomValueRepository<T extends Value = Value> {
 	) : void; 
 	addDataForAtomAt( propertyPath ) : void {
 		const tokens = tokenizeStringByDots( propertyPath );
-		if( tokens[ 0 ] === GLOBAL_SELECTOR ) { return this._addDataForGlobalSelectorAtom() }
+		if( tokens[ 0 ] === GLOBAL_SELECTOR ) {
+			return this._addDataForGlobalSelectorAtom();
+		}
 		let node = this._data;
 		for( let tLen = tokens.length - 1, t = 0; t < tLen; t++ ) {
 			const key = tokens[ t ];
@@ -152,34 +154,6 @@ class AtomValueRepository<T extends Value = Value> {
 		}
 		if( !( GLOBAL_SELECTOR in this._data.branches ) ) { return }
 		this._data.branches[ GLOBAL_SELECTOR ].value = this._computeGlobalSelectorAtomValue();
-	}
-	
-	removeAtomDataAt( propertyPath : string ) : void;
-	removeAtomDataAt(
-		/* split property path string */
-		propertyPath : Array<string>
-	) : void;
-	removeAtomDataAt( propertyPath ) : void {
-		const tokens = tokenizeStringByDots( propertyPath );
-		if( tokens[ 0 ] === GLOBAL_SELECTOR ) {
-			delete this._data.branches[ GLOBAL_SELECTOR ];
-			return;
-		}
-		let node = this._data;
-		for( let tLen = tokens.length - 1, t = 0; t < tLen; t++ ) {
-			const key = tokens[ t ];
-			if( !( key in node.branches ) ) { return }
-			node = node.branches[ key ];
-			if( node.isActive ) { return node.removeAtomNodeAt( tokens ) }
-		}
-		( function tryDescActiveNodeAt<T extends Value>( _node : AtomNode<T> ) {
-			if( _node.isActive ) {
-				return _node.removeAtomNodeAt( tokens )
-			}
-			for( let b in node.branches ) {
-				tryDescActiveNodeAt( node.branches[ b ] )
-			}
-		} )( node );
 	}
 
 	private _addDataForGlobalSelectorAtom() {

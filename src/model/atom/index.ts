@@ -19,10 +19,6 @@ class Atom {
 		this._connections.delete( accessorId );
 		return this._connections.size;
 	}
-
-	isConnected( accessorId : number ) : boolean {
-		return this._connections.has( accessorId );
-	}
 }
 
 export default Atom;
