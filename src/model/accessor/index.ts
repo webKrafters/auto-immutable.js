@@ -47,23 +47,28 @@ class Accessor <T extends Value> {
 	}
 	
 	addClient( clientId : string ) {
-		if( this._clients.has( clientId ) ) { return }
-		const atoms = this._atomRegistry;
-		const valueRepo = this._valueRepo;
-		for( const pathId of this._sourcePathIds ) {
-			if( !( pathId in atoms ) ) {
-				const pathTokens = this._getTokenizedPath( pathId );
-				valueRepo.addDataForAtomAt( pathTokens );
-				atoms[ pathId ] = valueRepo.getAtomAt( pathTokens );
-			}
-			atoms[ pathId ].addAccessor( this._id );
-		}
+		!this.numClients &&
+		this._secureAtoms();
 		this._clients.add( clientId );		
 	}
 
+	hasClient( clientId : string ) { return this._clients.has( clientId ) }
+
 	removeClient( clientId : string ) : boolean {
 		const deleted = this._clients.delete( clientId );
-		if( !deleted || this.numClients ) { return deleted }
+		deleted && !this.numClients && this._releaseAtoms();
+		return deleted;
+	}
+
+	private _getTokenizedPath( sourcePathId : number ) {
+		return this._pathRepo.getPathTokensAt(
+			this._pathRepo.getIdOfSanitizedPath(
+				this._pathRepo.getSanitizedPathOf( sourcePathId )
+			)
+		);
+	}
+
+	private _releaseAtoms(){
 		const atoms = this._atomRegistry;
 		const pathRepo = this._pathRepo;
 		for( const pathId of this._sourcePathIds ) {
@@ -76,15 +81,19 @@ class Accessor <T extends Value> {
 			delete atoms[ pathId ];
 			pathRepo.removeSourceId( pathId );
 		}
-		return deleted;
 	}
 
-	private _getTokenizedPath( sourcePathId : number ) {
-		return this._pathRepo.getPathTokensAt(
-			this._pathRepo.getIdOfSanitizedPath(
-				this._pathRepo.getSanitizedPathOf( sourcePathId )
-			)
-		);
+	private _secureAtoms() {
+		const atoms = this._atomRegistry;
+		const valueRepo = this._valueRepo;
+		for( const pathId of this._sourcePathIds ) {
+			if( !( pathId in atoms ) ) {
+				const pathTokens = this._getTokenizedPath( pathId );
+				valueRepo.addDataForAtomAt( pathTokens );
+				atoms[ pathId ] = valueRepo.getAtomAt( pathTokens );
+			}
+			atoms[ pathId ].addAccessor( this._id );
+		}
 	}
 }
 

@@ -16,18 +16,6 @@ import PathsRepo from '../paths';
 
 import Atom from '../../../atom';
 
-class ArrayUnique<T = any> extends Array<T> {
-	push( ...nodes : Array<any> ) {
-		let newLen = this.length;
-		for( let nLen = nodes.length, n = 0; n < nLen; n++ ) {
-			if( this.indexOf( nodes[ n ] ) !== -1 ) { continue }
-			super.push( nodes[ n ] );
-			newLen++;
-		}
-		return newLen;
-	}
-}
-
 class AtomNode<T extends Value>{
 	private _atom : Atom = null;
 	private _branches : Record<string, AtomNode<T>> = {};
@@ -246,13 +234,13 @@ class AtomNode<T extends Value>{
 	private _curateUnchangedAtoms( previouRootAtomValue : T ){
 		const rootAtomNode = this._rootAtomNode;
 		const nextRootAtomValue = rootAtomNode._sectionData;
-		const curatedNodes = new ArrayUnique<AtomNode<T>>();
+		const curatedNodes = new Set<AtomNode<T>>();
 		( function areEqual( pVal : T, nVal : Readonly<T>, path : Array<string> ) {
 			const nLen = Object.keys( nVal ?? 0 ).length;
 			const pLen = Object.keys( pVal ?? 0 ).length;
 			if( !pLen || !nLen ) {
 				if( pVal !== nVal ) { return false }
-				curatedNodes.push( rootAtomNode._findClosestNodeTo( path ) );
+				curatedNodes.add( rootAtomNode._findClosestNodeTo( path ) );
 				return true;
 			}
 			let equal = true;
@@ -264,7 +252,7 @@ class AtomNode<T extends Value>{
 				) ) { equal = false }
 			}
 			if( !equal || nLen !== pLen ) { return false }
-			curatedNodes.push( rootAtomNode._findClosestNodeTo( path ) );
+			curatedNodes.add( rootAtomNode._findClosestNodeTo( path ) );
 			return true;
 		} )( previouRootAtomValue, nextRootAtomValue, [] );
 		return curatedNodes;
@@ -350,8 +338,7 @@ class AtomNode<T extends Value>{
 
 	private _retainUnchangedDescendants( previouRootAtomValue : T ) {
 		const taskArgs : Array<[ AtomNode<T>, Array<string> ]> = [];
-		for( let unchangedNodes = this._curateUnchangedAtoms( previouRootAtomValue ), uLen = unchangedNodes.length, u = 0; u < uLen; u++ ) {
-			const { pathToRootAtom, rootAtomNode } = unchangedNodes[ u ];
+		for( const { pathToRootAtom, rootAtomNode } of this._curateUnchangedAtoms( previouRootAtomValue ) ) {
 			makePathWriteable( rootAtomNode._sectionData, pathToRootAtom, true );
 			set(
 				rootAtomNode._sectionData,

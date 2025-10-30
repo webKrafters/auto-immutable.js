@@ -1,5 +1,7 @@
 import isPlainObject from 'lodash.isplainobject';
 
+import dotize from '@webkrafters/path-dotize';
+
 /**
  * Curates the most inclusive propertyPaths from a list of property paths.
  * @example
@@ -10,10 +12,7 @@ import isPlainObject from 'lodash.isplainobject';
 export function arrangePropertyPaths( propertyPaths : Array<string> ) : Array<string> {
 	const superPathTokensMap : {[propertyPath: string]: Array<string>} = {};
 	for( const path of propertyPaths ) {
-		const pathTokens = path
-			.replace( /\[([0-9]+)\]/g, '.$1' )
-			.replace( /^\./, '' )
-			.split( /\./ );
+		const pathTokens = dotize( path ).split( /\./ );
 		L2: {
 			const replacedSuperPaths = [];
 			for( const superPath in superPathTokensMap ) {

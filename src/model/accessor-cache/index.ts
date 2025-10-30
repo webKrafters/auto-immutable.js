@@ -5,8 +5,6 @@ import {
 	type Value
 } from '../..';
 
-import isEmpty from 'lodash.isempty';
-
 import { GLOBAL_SELECTOR } from '../../constants';
 
 import Accessor from '../accessor';
@@ -32,10 +30,10 @@ class Sorted extends Array<number> {
 
 class AccessorCache<T extends Value> {
 
-	private _accessors : { [ cacheKey : string ]: Accessor<T> } = {};
+	private _accessRegister : { [ regKey : string ]: Accessor<T> } = {};
 
 	/** A map of { source path id : Atom Value Node } */
-	private _atoms : AccessorPayload<T> = {};
+	private _atomRegister : AccessorPayload<T> = {};
 
 	private _pathRepo = new PathRepository()
 
@@ -67,18 +65,19 @@ class AccessorCache<T extends Value> {
 		clientId : string,
 		...propertyPaths : Array<string>
 	) : AccessorResponse<T> {
-		if( isEmpty( propertyPaths ) ) { propertyPaths = [ GLOBAL_SELECTOR ] }
+		if( !propertyPaths.length ) { propertyPaths = [ GLOBAL_SELECTOR ] }
 		const pathIds = this._toSourcePathIds( propertyPaths );
-		const cacheKey = pathIds.join( ':' );
-		if( !( cacheKey in this._accessors ) ) {
-			this._accessors[ cacheKey ] = new Accessor<T>(
+		const regKey = pathIds.join( ':' );
+		if( !( regKey in this._accessRegister ) ) {
+			this._accessRegister[ regKey ] = new Accessor<T>(
 				pathIds,
-				this._atoms,
+				this._atomRegister,
 				this._pathRepo,
 				this._valueRepo
 			);
 		}
-		const accessor =  this._accessors[ cacheKey ];
+		const accessor =  this._accessRegister[ regKey ];
+		!accessor.hasClient( clientId ) &&
 		accessor.addClient( clientId );
 		return accessor.value;
 	}
@@ -88,10 +87,11 @@ class AccessorCache<T extends Value> {
 	 * cleanup
 	 */
 	unlinkClient( clientId : string ) {
-		const accessors = this._accessors;
-		for( const cacheKey in accessors ) {
-			accessors[ cacheKey ].removeClient( clientId );
-			delete accessors[ cacheKey ];
+		const register = this._accessRegister;
+		for( const regKey in register ) {
+			register[ regKey ].removeClient( clientId );
+			if( register[ regKey ].numClients ) { continue }
+			delete register[ regKey ];
 		}
 	}
 

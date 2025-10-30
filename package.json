@@ -10,7 +10,6 @@
   "contributors": [
     "steveswork <stephen.isienyi@gmail.com> (https://github.com/steveswork)"
   ],
-  "dependencies": {},
   "description": "Auto Immutable - self enforcing immutable data structure",
   "devDependencies": {
     "@babel/cli": "^7.17.0",
