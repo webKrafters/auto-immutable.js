@@ -1,4 +1,6 @@
-import { type ChangeInfo } from '../..';
+import type { ChangeInfo } from '../..';
+
+import type { PathIdInfo } from './repository/paths';
 
 import {
 	afterAll,
@@ -11,14 +13,13 @@ import {
 
 import { GLOBAL_SELECTOR } from '../..';
 
-import { PathIdInfo } from './repository/paths';
-
-import Accessor from '../accessor';
-
+import * as AccessorModule  from '../accessor';
 import PathRepository from './repository/paths';
 import AtomValueRepository from './repository/atom-value';
 
 import AccessorCache from '.';
+
+const Accessor = AccessorModule.default;
 
 describe( 'AccessorCache class', () => {
 
@@ -49,116 +50,217 @@ describe( 'AccessorCache class', () => {
 		} );
 	} );
 	describe( 'get(...)', () => {
-		const PATHS = [ 'a.v.c', 'a.c.e', GLOBAL_SELECTOR ];
-		const PATH_ID_MAP = {
-			[ PATHS[ 0 ] ]: 1,
-			[ PATHS[ 1 ] ]: 2,
-			[ PATHS[ 2 ] ]: 3
-		};
+		let reachedFirstRun = false;
 		let cache : AccessorCache<{}>;
-		let getPathInfoSpy : jest.SpiedFunction<(path: string) => PathIdInfo>;
 		let addClientSpy : jest.SpiedFunction<(clientId: string) => void>;
+		let getPathInfoAtSpy : jest.SpiedFunction<(path: string) => PathIdInfo>;
+		// @ts-ignore
+		let accessorSpy = jest.SpiedClass<typeof AccessorModule>;
 		beforeAll(() => {
 			addClientSpy = jest.spyOn( Accessor.prototype, 'addClient' );
-			getPathInfoSpy = jest
-				.spyOn( PathRepository.prototype, 'getPathInfoAt' )
-				.mockImplementation(( path : string ) => ({
-					sanitizedPathId: PATH_ID_MAP[ path ] - 2,
-					sourcePathId: PATH_ID_MAP[ path ]
-				}) );
+			getPathInfoAtSpy = jest.spyOn( PathRepository.prototype, 'getPathInfoAt' );
+			accessorSpy = jest
+				.spyOn( AccessorModule, 'default' )
+				.mockImplementation(( ...args ) => new Accessor( ...args ));
 		});
 		beforeEach(() => {
-			getPathInfoSpy.mockClear();
-			addClientSpy.mockClear();
+			if( !reachedFirstRun ) {
+				reachedFirstRun = true;
+			} else {
+				addClientSpy.mockClear();
+				getPathInfoAtSpy.mockClear();
+				accessorSpy.mockClear();
+			}
 			cache = new AccessorCache({});
+		});
+		afterAll(() => {
+			addClientSpy.mockRestore();
+			getPathInfoAtSpy.mockRestore();
+			accessorSpy.mockRestore();
 		});
 		test( `defaults to obtaining ${ GLOBAL_SELECTOR } data`, () => {
 			cache.get( 'TEST_CLIENT_ID' );
-			expect( getPathInfoSpy ).toHaveBeenCalledTimes( 1 );
-			expect( getPathInfoSpy ).toHaveBeenCalledWith( GLOBAL_SELECTOR );
+			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 2 );
+			for( let
+				pathInfoMock = getPathInfoAtSpy.mock,
+				pLen = pathInfoMock.calls.length,
+				p = 0;
+				p < pLen;
+				p++
+			) {
+				expect( pathInfoMock.calls[ p ] ).toEqual([ GLOBAL_SELECTOR ]);
+				expect( pathInfoMock.results[ p ].value ).toEqual({
+					sanitizedPathId: 1, sourcePathId: 1
+				});
+			}
 		} );
 		test( `shares same accessor between clients`, () => {
-			/* setting up original accessor data at ['a.v.c', 'a.c.e'] */
-			cache.get( 'REQUEST_1', PATHS[ 0 ], PATHS[ 1 ] );
-			expect( getPathInfoSpy ).toHaveBeenCalledTimes( 2 );
-			expect( getPathInfoSpy.mock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
-			expect( getPathInfoSpy.mock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
+			// setting up original accessor data at ['a.v.c', 'a.c.e']
+			const PATHS = [ 'a.v.c', 'a.c.e' ];
+			cache.get( 'REQUEST_1', ...PATHS );
 			expect( addClientSpy ).toHaveBeenCalledTimes( 1 );
 			expect( addClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_1' ]);
-			/* clearing out test mocks */
+			// first two calls for adding two non-existent
+			// atom paths for this accesor client.
+			// last two calls for retrieving the newly added
+			// atom paths for this accessor client.
+			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 4 );
+			const pathInfoMock = getPathInfoAtSpy.mock;
+			// adding first path to atom repo
+			expect( pathInfoMock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
+			expect( pathInfoMock.results[ 0 ].value ).toEqual({
+				sanitizedPathId: 1, sourcePathId: 1
+			});
+			// adding second path to atom repo
+			expect( pathInfoMock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
+			expect( pathInfoMock.results[ 1 ].value ).toEqual({
+				sanitizedPathId: 2, sourcePathId: 2
+			});
+			// retrieving first path from atom repo
+			expect( pathInfoMock.calls[ 2 ] ).toEqual([ PATHS[ 0 ] ]);
+			expect( pathInfoMock.results[ 2 ].value ).toEqual({
+				sanitizedPathId: 1, sourcePathId: 1
+			});
+			// retrieving second path from atom repo
+			expect( pathInfoMock.calls[ 3 ] ).toEqual([ PATHS[ 1 ] ]);
+			expect( pathInfoMock.results[ 3 ].value ).toEqual({
+				sanitizedPathId: 2, sourcePathId: 2
+			});
+			// clearing out test mocks
 			addClientSpy.mockClear();
-			getPathInfoSpy.mockClear();
-			/* reusing same accessor for a different request */
+			getPathInfoAtSpy.mockClear();
+			// reusing same accessor for a different request
 			cache.get( 'REQUEST_2', PATHS[ 0 ], PATHS[ 1 ] );
-			expect( getPathInfoSpy ).not.toHaveBeenCalled();
 			expect( addClientSpy ).toHaveBeenCalledTimes( 1 );
 			expect( addClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_2' ]);
+			// first two calls for retrieving the previously added
+			// two atom paths for this new accessor client
+			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 2 );
+			// retrieving first path from atom repo
+			expect( pathInfoMock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
+			expect( pathInfoMock.results[ 0 ].value ).toEqual({
+				sanitizedPathId: 1, sourcePathId: 1
+			});
+			// retrieving second path from atom repo
+			expect( pathInfoMock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
+			expect( pathInfoMock.results[ 1 ].value ).toEqual({
+				sanitizedPathId: 2, sourcePathId: 2
+			});
 		} );
 		test( `reordering access paths will not produce new aaccessor`, () => {
-			/* setting up original accessor data at ['a.v.c', 'a.c.e'] */
-			cache.get( 'REQUEST_1', PATHS[ 0 ], PATHS[ 1 ] );
-			expect( getPathInfoSpy ).toHaveBeenCalledTimes( 2 );
-			expect( getPathInfoSpy.mock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
-			expect( getPathInfoSpy.mock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
+			// setting up original accessor data at ['a.v.c', 'a.c.e']
+			const PATHS = [ 'a.v.c', 'a.c.e' ];
+			cache.get( 'REQUEST_1', ...PATHS );
 			expect( addClientSpy ).toHaveBeenCalledTimes( 1 );
 			expect( addClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_1' ]);
-			/* clearing out test mocks */
+			// first two calls for adding two non-existent
+			// atom paths for this accesor client.
+			// last two calls for retrieving the newly added
+			// atom paths for this accessor client.
+			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 4 );
+			const pathInfoMock = getPathInfoAtSpy.mock;
+			// adding first path to atom repo
+			expect( pathInfoMock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
+			expect( pathInfoMock.results[ 0 ].value ).toEqual({
+				sanitizedPathId: 1, sourcePathId: 1
+			});
+			// adding second path to atom repo
+			expect( pathInfoMock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
+			expect( pathInfoMock.results[ 1 ].value ).toEqual({
+				sanitizedPathId: 2, sourcePathId: 2
+			});
+			// retrieving first path from atom repo
+			expect( pathInfoMock.calls[ 2 ] ).toEqual([ PATHS[ 0 ] ]);
+			expect( pathInfoMock.results[ 2 ].value ).toEqual({
+				sanitizedPathId: 1, sourcePathId: 1
+			});
+			// retrieving second path from atom repo
+			expect( pathInfoMock.calls[ 3 ] ).toEqual([ PATHS[ 1 ] ]);
+			expect( pathInfoMock.results[ 3 ].value ).toEqual({
+				sanitizedPathId: 2, sourcePathId: 2
+			});
+			// clearing out test mocks
 			addClientSpy.mockClear();
-			getPathInfoSpy.mockClear();
-			/* reusing same accessor for a request contaning reordered access paths */
+			getPathInfoAtSpy.mockClear();
+			// reusing same accessor for a request contaning reordered access paths
 			cache.get( 'REQUEST_2', PATHS[ 1 ], PATHS[ 0 ] );
-			expect( getPathInfoSpy ).not.toHaveBeenCalled();
 			expect( addClientSpy ).toHaveBeenCalledTimes( 1 );
 			expect( addClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_2' ]);
+			// first two calls for retrieving the previously added
+			// two atom paths for this new accessor client
+			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 2 );
+			// retrieving first path from atom repo
+			expect( pathInfoMock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
+			expect( pathInfoMock.results[ 0 ].value ).toEqual({
+				sanitizedPathId: 1, sourcePathId: 1
+			});
+			// retrieving second path from atom repo
+			expect( pathInfoMock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
+			expect( pathInfoMock.results[ 1 ].value ).toEqual({
+				sanitizedPathId: 2, sourcePathId: 2
+			});
 		} );
 	} );
 	describe( 'unlinkClient(...)', () => {
-		const PATHS = [ 'a.v.c', 'a.c.e', GLOBAL_SELECTOR ];
-		const PATH_ID_MAP = {
-			[ PATHS[ 0 ] ]: 1,
-			[ PATHS[ 1 ] ]: 2,
-			[ PATHS[ 2 ] ]: 3
-		};
-		let cache : AccessorCache<{}>;
-		let addClientSpy : jest.SpiedFunction<(clientId: string) => void>;
-		let getPathInfoSpy : jest.SpiedFunction<(path: string) => PathIdInfo>;
+		class TestCache extends AccessorCache<{}> {
+			get numberOfAccessors() {
+				return Object.keys( this.accessRegister ).length;
+			}
+			public getAccessedPathGroupsBy( clientId : string ) {
+				return this. _getAccessedPathGroupsBy( clientId );
+			}
+		}
+		let reachedFirstRun = false;
+		let cache : TestCache;
 		let removeClientSpy : jest.SpiedFunction<(clientId: string) => void>;
 		beforeAll(() => {
-			addClientSpy = jest.spyOn( Accessor.prototype, 'addClient' );
-			getPathInfoSpy = jest
-				.spyOn( PathRepository.prototype, 'getPathInfoAt' )
-				.mockImplementation(( path : string ) => ({
-					sanitizedPathId: PATH_ID_MAP[ path ] - 2,
-					sourcePathId: PATH_ID_MAP[ path ]
-				}) );
 			removeClientSpy = jest.spyOn( Accessor.prototype, 'removeClient' );
 		});
 		beforeEach(() => {
-			addClientSpy.mockClear();
-			getPathInfoSpy.mockClear();
-			removeClientSpy.mockClear();
-			cache = new AccessorCache({});
+			if( !reachedFirstRun ) {
+				reachedFirstRun = true;
+			} else {
+				removeClientSpy.mockClear();
+			}
+			cache = new TestCache({});
 		});
-		test( `removes client from all accessors where registered`, () => {
-			cache.get( 'REQUEST_1', PATHS[ 0 ], PATHS[ 1 ], 'j.b.e' );
-			cache.get( 'REQUEST_2', PATHS[ 0 ], PATHS[ 1 ] );
-			cache.get( 'REQUEST_1', PATHS[ 0 ], PATHS[ 1 ] );
+		afterAll(() => removeClientSpy.mockRestore() );
+		test( `removes client from all existing accessors`, () => {
+			const PATHS = [ 'a.v.c', 'a.c.e' ];
+			cache.get( 'REQUEST_1', ...PATHS, 'j.b.e' );
+			cache.get( 'REQUEST_2', ...PATHS );
+			cache.get( 'REQUEST_1', ...PATHS );
 			cache.unlinkClient( 'REQUEST_1' );
 			expect( removeClientSpy ).toHaveBeenCalledTimes( 2 );
 			expect( removeClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_1' ]);
-			expect( removeClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_1' ]);
+			expect( removeClientSpy.mock.calls[ 1 ] ).toEqual([ 'REQUEST_1' ]);
 			removeClientSpy.mockClear();
 			cache.unlinkClient( 'REQUEST_1' );
-			expect( removeClientSpy ).not.toHaveBeenCalled();
+			expect( removeClientSpy ).toHaveBeenCalledTimes( 1 );
 			removeClientSpy.mockClear();
 			cache.unlinkClient( 'REQUEST_2' );
 			expect( removeClientSpy ).toHaveBeenCalledTimes( 1 );
 			expect( removeClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_2' ]);
-			removeClientSpy.mockClear();
-			cache.unlinkClient( 'REQUEST_2' );
-			expect( removeClientSpy ).not.toHaveBeenCalled();
+		} );
+		test( `discards an accessor withh last client removal`, () => {
+			expect( cache.numberOfAccessors ).toBe( 0 );
+			const PATHS = [ 'a.v.c', 'a.c.e' ];
+			cache.get( 'REQUEST_1', ...PATHS, 'j.b.e' );
+			cache.get( 'REQUEST_2', ...PATHS );
+			cache.get( 'REQUEST_1', ...PATHS );
+			expect( cache.numberOfAccessors ).toBe( 2 );
+			expect( cache.getAccessedPathGroupsBy( 'REQUEST_1' ) ).toHaveLength( 2 );
+			expect( cache.getAccessedPathGroupsBy( 'REQUEST_2' ) ).toHaveLength( 1 );
+			// will remove accessor at [ ...PATHS, 'j.b.e' ] along with the client REQUEST_1
 			cache.unlinkClient( 'REQUEST_1' );
-			expect( removeClientSpy ).not.toHaveBeenCalled();
+			expect( cache.numberOfAccessors ).toBe( 1 );
+			expect( cache.getAccessedPathGroupsBy( 'REQUEST_1' ) ).toHaveLength( 0 );
+			expect( cache.getAccessedPathGroupsBy( 'REQUEST_2' ) ).toHaveLength( 1 );
+			// will remove the remaining accessor at PATHS along with the last client REQUEST_2
+			cache.unlinkClient( 'REQUEST_2' );
+			expect( cache.numberOfAccessors ).toBe( 0 );
+			expect( cache.getAccessedPathGroupsBy( 'REQUEST_1' ) ).toHaveLength( 0 );
+			expect( cache.getAccessedPathGroupsBy( 'REQUEST_2' ) ).toHaveLength( 0 );
 		} );
 	} );
 } );	

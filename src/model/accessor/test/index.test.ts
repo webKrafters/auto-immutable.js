@@ -1,188 +1,210 @@
 import {
+	afterAll,
 	beforeAll,
 	describe,
 	expect,
+	jest,
 	test
 } from '@jest/globals';
 
-import getProperty from '@webkrafters/get-property';
+import { GLOBAL_SELECTOR } from '../../..';
 
-import Atom from '../../atom';
+import Accessor from '../';
+import * as PathRepositoryModule from '../../accessor-cache/repository/paths';
+import AtomNode from '../../accessor-cache/repository/atom-value/node';
+import AtomValueRepository from '../../accessor-cache/repository/atom-value';
 
-import Accessor from '..';
+const PathRepository = PathRepositoryModule.default;
 
-import createSourceData from '../../../test-artifacts/data/create-data-obj';
-import { isReadonly } from '../../../test-artifacts/utils';
+function getFakeAtomNodeFactory() {
+	let atomClientCountMap : {[atomId:string]: number} = {};
+	return ( atomId : string ) => ({
+		addAccessor( id : string ){
+			if( atomId in atomClientCountMap ) {
+				++atomClientCountMap[ atomId ];
+			} else {
+				atomClientCountMap[ atomId ] = 1;
+			}
+			return atomClientCountMap[ atomId ]
+		},
+		remove(){},
+		removeAccessor( id : string ){
+			return --atomClientCountMap[ atomId ];
+		}
+	} as unknown as AtomNode<{}> );
+};
 
 describe( 'Accessor class', () => {
-	const source = createSourceData();
-	const accessedPropertyPaths = Object.freeze([
-		'address',
-		'friends[1].id',
-		'friends[1]',
-		'friends[1].name.last',
-		'history.places',
-		'history.places[2].year',
-		'history',
-		'registered.time',
-		'registered.time.hours',
-		'tags[4]'
-	]) as Array<string>;
-	const accessor = new Accessor( accessedPropertyPaths );
-	const SET_ERROR = propName => `Cannot set property ${ propName } of #<Accessor> which has only a getter`;
-	test( 'creates an accessor', () => expect( accessor ).toBeInstanceOf( Accessor ) );
-	describe( 'numClients property', () => {
-		test( 'is 0 by default', () => expect( accessor.numClients ).toBe( 0 ) );
-		test( 'is privately mutable only', () => expect(() => {
-			// @ts-expect-error
-			accessor.numClients = expect.any( Number );
-		}).toThrow( SET_ERROR`numClients` ) );
-	} );
-	describe( 'id property', () => {
-		test( 'holds an incremental unique integer value', () => {
-			const testAccessor = new Accessor( accessedPropertyPaths );
-			expect( testAccessor.id ).toBeGreaterThan( accessor.id );
+	let sourceIds = [ 1, 2, 3, 4 ];
+	describe( 'properties', () => {
+		let accessor : Accessor<{}>;
+		beforeEach(() =>  {
+			const pathRepo = new PathRepository();
+			accessor = new Accessor(
+				sourceIds,
+				{
+					1: {} as AtomNode<{}>,
+					2: {} as AtomNode<{}>,
+					3: {} as AtomNode<{}>,
+					4: {} as AtomNode<{}>
+				},
+				pathRepo,
+				new AtomValueRepository( {}, pathRepo )
+			);
 		} );
-		test( 'is privately mutable only', () => expect(() => {
-			// @ts-expect-error
-			accessor.id = expect.any( Number )
-		}).toThrow( SET_ERROR`id` ) );
-	} );
-	describe( 'paths property', () => {
-		test( 'is privately mutable only', () => expect(() => {
-			// @ts-expect-error
-			accessor.paths = expect.any( Array )
-		}).toThrow( SET_ERROR`paths` ) );
-		test( 'is a distinct value from the `accessedPropertyPaths`', () => {
-			expect( accessor.paths ).not.toBe( accessedPropertyPaths );
-		});
-		test( 'preserves all propertyPaths options supplied', () => {
-			expect( accessor.paths ).not.toBe( accessedPropertyPaths );
-			expect( accessor.paths ).toStrictEqual( accessedPropertyPaths );
+		describe( 'id', () => {
+			test( 'will produce the internal for this accessor', () => {
+				expect( accessor.id ).toEqual( expect.any( Number ) );
+			} );
 		} );
-	} );
-	describe( 'value property', () => {
-		test( 'is empty object by default', () => expect( accessor.value ).toEqual({}) );
-		test( 'contains only readonly value properties', () => {
-			expect( Object.values( accessor.value ).every( isReadonly ) ).toBe( true )
+		describe( 'numClients', () => {
+			test( 'produces the number clients using this accessor', () => {
+				const createAtomNode = getFakeAtomNodeFactory();
+				const pathRepo = new PathRepository();
+				const accessor = new Accessor(
+					sourceIds,
+					{
+						1: createAtomNode( '1' ),
+						2: createAtomNode( '2' ),
+						3: createAtomNode( '3' ),
+						4: createAtomNode( '4' )
+					},
+					pathRepo,
+					new AtomValueRepository( {}, pathRepo )
+				);
+				expect( accessor.numClients ).toEqual( 0 );
+				accessor.addClient( 'TEST_1' );
+				expect( accessor.numClients ).toEqual( 1 );
+				accessor.addClient( 'TEST_2' );
+				expect( accessor.numClients ).toEqual( 2 );
+				accessor.addClient( 'TEST_3' );
+				expect( accessor.numClients ).toEqual( 3 );
+				accessor.removeClient( 'TEST_2' );
+				expect( accessor.numClients ).toEqual( 2 );
+			} );
 		} );
-		test( 'is privately mutable only', () => expect(() => {
-			// @ts-expect-error
-			accessor.value = expect.anything()
-		}).toThrow( SET_ERROR`value` ) );
+		describe( 'sourcePathIds', () => {
+			test( 'proudces a sourcePathId-to-atomValue object', () => {
+				expect( accessor.sourcePathIds ).toEqual( sourceIds );
+			} );
+		} );
+		describe( 'value', () => {
+			test( 'proudces a sourcePathId-to-atomValue object', () => {
+				expect( accessor.value ).toEqual({
+					1: undefined,
+					2: undefined,
+					3: undefined,
+					4: undefined
+				});
+			} );
+		} );
 	} );
 	describe( 'addClient(...)', () => {
-		test( 'adds new client id to `clients`', () => {
-			const numClients = accessor.numClients;
-			const id = expect.any( String ) as unknown as string;
-			accessor.addClient( id );
-			expect( accessor.numClients ).toBe( numClients + 1 );
-			accessor.removeClient( id );
-		} );
-		test( 'ignores requests to add existing clients', () => {
-			const id = expect.any( String ) as unknown as string;
-			accessor.addClient( id );
-			const numClients = accessor.numClients;
-			accessor.addClient( id );
-			accessor.addClient( id );
-			expect( accessor.numClients ).toBe( numClients );
-			accessor.removeClient( id );
-		} );
-	} );
-	describe( 'hasClient(...)', () => {
-		test( 'returns `false` if client not found in `clients`', () => {
-			const id = expect.any( String ) as unknown as string;
-			accessor.removeClient( id );
-			expect( accessor.hasClient( id ) ).toBe( false );
-		} );
-		test( 'returns `true` if client found in `clients`', () => {
-			const id = expect.any( String ) as unknown as string;
-			accessor.addClient( id );
-			expect( accessor.hasClient( id ) ).toBe( true );
-			accessor.removeClient( id );
-		} );
-	} );
-	describe( 'removeClient(...)', () => {
-		test( 'removes client id from `clients`', () => {
-			const id = expect.any( String ) as unknown as string;
-			accessor.addClient( id );
-			const numClients = accessor.numClients;
-			accessor.removeClient( id );
-			expect( accessor.numClients ).toBe( numClients - 1 );
-		} );
-		test( 'ignores requests to remove non-existing clients', () => {
-			const id = expect.any( String ) as unknown as string;
-			accessor.addClient( id );
-			accessor.removeClient( id );
-			const numClients = accessor.numClients;
-			accessor.removeClient( id );
-			accessor.removeClient( id );
-			expect( accessor.numClients ).toBe( numClients );
-		} );
-	} );
-	describe( 'refreshValue(...)', () => {
-		let accessor, accessedPropertyPaths;
-		/** @type {(state?: {[x:string]:*}, paths?: string[]) => {[path: string]: Atom<string>}} */
-		let createAccessorAtoms;
-		let source, initVal, retVal, retValExpected, runTest;
-		beforeAll(() => {
-			source = createSourceData();
-			retValExpected = {
-				address: '760 Midwood Street, Harborton, Massachusetts, 7547',
-				'friends[1].id': 1,
-				'friends[1].name.last': 'Roberson',
-				'history.places[2].year': '2017',
-				'registered.time': {
-					hours: 9,
-					minutes: 55,
-					seconds: 46
+		test( "registers client's id", () => {
+			const createAtomNode = getFakeAtomNodeFactory();
+			const pathRepo = new PathRepository();
+			const accessor = new Accessor(
+				sourceIds,
+				{
+					1: createAtomNode( '1' ),
+					2: createAtomNode( '2' ),
+					3: createAtomNode( '3' ),
+					4: createAtomNode( '4' )
 				},
-				'tags[4]': 'ullamco'
-			};
-			accessedPropertyPaths = Object.keys( retValExpected );
-			createAccessorAtoms = ( state = source, paths = accessedPropertyPaths ) => paths.reduce(( a, p ) => {
-				a[ p ] = new Atom( getProperty( state, p ).value );
-				return a;
-			}, {});
-			accessor = new Accessor( accessedPropertyPaths );
-			initVal = accessor.value;
-			retVal = accessor.refreshValue( createAccessorAtoms( source ) );
-			runTest = createAccessor => {
-				const source = createSourceData();
-				const updates = {
-					about: 'SOME TEST TEXT',
-					address: 'SOME TEST TEXT',
-					age: 52,
-					balance: 268957
-				};
-				const updatedPaths = Object.keys( updates );
-				const accessedPropertyPaths = [ 'id', ...updatedPaths, 'company', 'email', 'eyeColor', 'favoriteFruit', 'friends.name' ];
-				const accessor = createAccessor( accessedPropertyPaths );
-				const atomMap = createAccessorAtoms( source, accessedPropertyPaths );
-				accessor.refreshValue( atomMap );
-				updatedPaths.forEach( p => {
-					source[ p ] = updates[ p ];
-					atomMap[ p ].setValue( updates[ p ] );
-				} );
-				accessor.outdatedPaths = updatedPaths;
-				expect( accessor.refreshValue( atomMap ) ).toEqual( expect.objectContaining( updates ) );
-			};
-		});
-		test( "immediately constructs atoms' current values into an accessor value", () => {
-			expect( initVal ).toEqual( retValExpected );
-			expect( accessor.value ).toEqual( retValExpected );
-			expect( retVal ).toBe( initVal );
+				pathRepo,
+				new AtomValueRepository( {}, pathRepo )
+			);
+			expect( accessor.numClients ).toEqual( 0 );
+			accessor.addClient( 'TEST_1' );
+			expect( accessor.numClients ).toEqual( 1 );
 		} );
-		test( 'returns the latest constructed value', () => expect( retVal ).toEqual( retValExpected ) );
-		test( 'ensures readonly property values', () => {
-			expect( Object.values( accessor.value ).every( isReadonly ) ).toBe( true );
+	} );
+
+	describe( 'hasClient(...)', () => {
+		test( "checks client's id is already registered to this accessor", () => {
+			const createAtomNode = getFakeAtomNodeFactory();
+			const pathRepo = new PathRepository();
+			const accessor = new Accessor(
+				sourceIds,
+				{
+					1: createAtomNode( '1' ),
+					2: createAtomNode( '2' ),
+					3: createAtomNode( '3' ),
+					4: createAtomNode( '4' )
+				},
+				pathRepo,
+				new AtomValueRepository( {}, pathRepo )
+			);
+			expect( accessor.hasClient( 'TEST_1' ) ).toBe( false );
+			accessor.addClient( 'TEST_1' );
+			expect( accessor.hasClient( 'TEST_1' ) ).toBe( true );
+			accessor.removeClient( 'TEST_1' );
+			expect( accessor.hasClient( 'TEST_1' ) ).toBe( false );
 		} );
-		describe( 'attempts to reference non-existent atoms', () => {
-			test( 'are ignored', () => runTest( accessedPropertyPaths => new Accessor([ ...accessedPropertyPaths, 'UNKNOWN' ])) );
+	} );
+
+	describe( 'removeClient(...)', () => {
+		test( "unregisteres client's id from this accessor", () => {
+			const createAtomNode = getFakeAtomNodeFactory();
+			const pathRepo = new PathRepository();
+			const accessor = new Accessor(
+				sourceIds,
+				{
+					1: createAtomNode( '1' ),
+					2: createAtomNode( '2' ),
+					3: createAtomNode( '3' ),
+					4: createAtomNode( '4' )
+				},
+				pathRepo,
+				new AtomValueRepository( {}, pathRepo )
+			);
+			accessor.addClient( 'TEST_1' );
+			accessor.addClient( 'TEST_2' );
+			accessor.removeClient( 'TEST_1' );
 		} );
-		describe( 'when updated paths < resident accessor paths while resident accessor paths > MODERATE_NUM_PATHS_THRESHOLD', () => {
-			// @ts-expect-error
-			test( 'optimizes refresh operation (coverage test)', () => runTest(( ...args ) => new Accessor( ...args )) )
+		test( "initiates atom removal if outgoing accessor is the last remaininig", () => {
+			const createAtomNode = getFakeAtomNodeFactory();
+			const removeAtomMock = jest.fn();
+			const getPathTokensAtSpy = jest.spyOn( PathRepository.prototype, 'getPathTokensAt' ).mockImplementation(( id : number ) => [] );
+			const getIdOfSanitizedPathSpy = jest.spyOn( PathRepository.prototype, 'getIdOfSanitizedPath' ).mockImplementation(( path : string ) => 0 );
+			const getSanitizedPathOfSpy = jest.spyOn( PathRepository.prototype, 'getSanitizedPathOf' ).mockImplementation(( id : number ) => '' );
+			const pathRepo = new PathRepository();
+			const accessor1 = new Accessor(
+				sourceIds,
+				{
+					1: { ...createAtomNode( '1' ), remove: removeAtomMock } as unknown as AtomNode<{}>,
+					2: { ...createAtomNode( '2' ), remove: removeAtomMock } as unknown as AtomNode<{}>,
+					3: { ...createAtomNode( '3' ), remove: removeAtomMock } as unknown as AtomNode<{}>,
+					4: { ...createAtomNode( '4' ), remove: removeAtomMock } as unknown as AtomNode<{}>
+				},
+				pathRepo,
+				new AtomValueRepository( {}, pathRepo )
+			);
+			accessor1.addClient( 'TEST_1' );
+			const accessor2 = new Accessor(
+				[ 1, 4 ],
+				{	
+					1: { ...createAtomNode( '1' ), remove: removeAtomMock } as unknown as AtomNode<{}>,
+					4: { ...createAtomNode( '4' ), remove: removeAtomMock } as unknown as AtomNode<{}>
+				},
+				pathRepo,
+				new AtomValueRepository( {}, pathRepo )
+			);
+			accessor2.addClient( 'TEST_1' );
+			accessor1.addClient( 'TEST_2' );
+
+			expect( removeAtomMock ).not.toHaveBeenCalled();
+			accessor1.removeClient( 'TEST_1' );
+			expect( removeAtomMock ).toHaveBeenCalledTimes( 0 );
+			accessor1.removeClient( 'TEST_2' );
+			expect( removeAtomMock ).toHaveBeenCalledTimes( 2 );
+			removeAtomMock.mockClear();
+			accessor2.removeClient( 'TEST_1' );
+			expect( removeAtomMock ).toHaveBeenCalledTimes( 2 );
+
+			getPathTokensAtSpy.mockRestore();
+			getIdOfSanitizedPathSpy.mockRestore();
+			getSanitizedPathOfSpy.mockRestore();
 		} );
 	} );
 } );

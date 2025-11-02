@@ -3,6 +3,7 @@ import type {
 	AccessorResponse,
 	Value
 } from '../..';
+import { makeReadonly } from '../../utils';
 import AtomValueRepository from '../accessor-cache/repository/atom-value';
 
 import PathRepository from '../accessor-cache/repository/paths';
@@ -27,7 +28,7 @@ class Accessor <T extends Value> {
 		this._id = ++Accessor._NUM_INSTANCES;
 		this._atomRegistry = atomRegistry;
 		this._pathRepo = pathRepo;
-		this._sourcePathIds = sourcePathIds;
+		this._sourcePathIds = [ ...sourcePathIds ];
 		this._valueRepo = valueRepo;
 	}
 
@@ -74,9 +75,7 @@ class Accessor <T extends Value> {
 		for( const pathId of this._sourcePathIds ) {
 			if( !( pathId in atoms ) || (
 				atoms[ pathId ].removeAccessor( this._id ) > 0
-			) ) {
-				continue;
-			}
+			) ) { continue }
 			atoms[ pathId ].remove();
 			delete atoms[ pathId ];
 			pathRepo.removeSourceId( pathId );

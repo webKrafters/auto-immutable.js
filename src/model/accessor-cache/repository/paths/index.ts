@@ -56,6 +56,14 @@ class PathRepository {
 		return this._sanitizedIdToTokenization[ sanitizedPathId ].sanitizedTokens;
 	}
 
+	getSourcePathAt( sourcePathId : number ) {
+		const sIdMap = this._sourceToIdMap;
+		for( let k in sIdMap ) {
+			if( sIdMap[ k ] !== sourcePathId ) { continue }
+			return k;
+		}
+	}
+
 	removeSource( sourcePath : string ) {
 		if( !( sourcePath in this._sourceToIdMap ) ) { return }
 		const sourcePathId = this._sourceToIdMap[ sourcePath ];
@@ -77,19 +85,15 @@ class PathRepository {
 	}
 
 	removeSourceId( sourcePathId : number ) {
-		if( !( sourcePathId in this._sourceIdToSanitizedMap ) ) { return }
-		const sIdMap = this._sourceToIdMap;
-		for( let k in sIdMap ) {
-			if( sIdMap[ k ] !== sourcePathId ) { continue }
-			return this.removeSource( k );
-		}
+		sourcePathId in this._sourceIdToSanitizedMap &&
+		this.removeSource( this.getSourcePathAt( sourcePathId ) );
 	}
 
 	private _addNewSourcePath( sourcePath : string )  : PathIdInfo {
 		const sourcePathId = this._reuseSourceIds.pop() ?? ++this._maxSourceId;
 		this._sourceToIdMap[ sourcePath ] = sourcePathId;
 		let sanitized = sourcePath === GLOBAL_SELECTOR ? GLOBAL_SELECTOR : dotize( sourcePath );
-		let sanitizedPathId = null;
+		let sanitizedPathId : number = null;
 		if( sanitized in this._sanitizedToIdMap ) {
 			sanitizedPathId = this._sanitizedToIdMap[ sanitized ];
 			this._sanitizedIdToTokenization[ sanitizedPathId ].sourceIds.push( sourcePathId );

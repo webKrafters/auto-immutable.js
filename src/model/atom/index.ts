@@ -4,9 +4,7 @@
  */
 class Atom {
 
-	private _connections : Set<number>;
-
-	constuctor() { this._connections = new Set() }
+	private _connections = new Set<number>();
 
 	/** @returns {number} Number of connections remaining */
 	connect( accessorId : number ) : number {
