@@ -162,7 +162,7 @@ describe( 'Accessor class', () => {
 			accessor.addClient( 'TEST_2' );
 			accessor.removeClient( 'TEST_1' );
 		} );
-		test( "initiates atom removal if outgoing accessor is the last remaininig", () => {
+		test( "initiates atom removal with the last accessor client removal", () => {
 			const createAtomNode = getFakeAtomNodeFactory();
 			const removeAtomMock = jest.fn();
 			const getPathTokensAtSpy = jest.spyOn( PathRepository.prototype, 'getPathTokensAt' ).mockImplementation(( id : number ) => [] );

@@ -6,9 +6,17 @@ import {
 	test
 } from '@jest/globals';
 
+import type { Value } from './';
+
 import AccessorCache from './model/accessor-cache';
 import { Immutable } from './main';
 import { deps, Connection } from './connection';
+
+type Data = Value & {
+    a : number,
+    b: { message: string },
+    valid: boolean
+};
 
 describe( 'Connection class', () => { 
     const setup = () => {
@@ -20,7 +28,7 @@ describe( 'Connection class', () => {
         const key = new Immutable({});
         const map = new WeakMap();
         map.set( key, imDeps.assignCache() );
-        const cn = new Connection( expectedId, { key, map } );
+        const cn = new Connection<Data>( expectedId, { key, map } );
         const teardown = () => {
             imDeps.assignCache = assignCacheOrig;
         }
@@ -49,7 +57,7 @@ describe( 'Connection class', () => {
                 && d[ 'b.message' ] === undefined
                 && d.valid === undefined;
 
-            const protectedData = {
+            const protectedData : Data = {
                 a: 333,
                 b: {
                     message: 'Doing consumer testing...'
@@ -76,8 +84,8 @@ describe( 'Connection class', () => {
 
             passedFoundTest =
                 Object.keys( v ).length === 2
-                && v[ 'b.message' ] === protectedData.b.message
-                && v.valid === protectedData.valid;
+                && v[ 'b.message' ] as unknown as string === protectedData.b.message
+                && v.valid as unknown as boolean === protectedData.valid;
 
            teardown();
         } );

@@ -36,7 +36,7 @@ describe( 'setValue(...)', () => {
 	describe( 'basics', () => {
 		let newAge : number;
 		let changes : Changes<Value>;
-		let onChangeMock : Listener;
+		let onChangeMock : jest.Mock;
 		let prevAge : number;
 		beforeAll(() => {
 			newAge = 56;
@@ -47,13 +47,13 @@ describe( 'setValue(...)', () => {
 		});
 		afterAll(() => { value.age = prevAge })
 		test( 'updates value with new changes', () => expect( value.age ).toBe( newAge ) );
-		test( 'notifies listeners of value changes', () => {
+		test( 'notifies listeners of the final resulting changes and affected paths', () => {
 			expect( onChangeMock ).toHaveBeenCalledTimes( 1 );
-			expect( onChangeMock ).toHaveBeenCalledWith( changes );
+			expect( onChangeMock ).toHaveBeenCalledWith( changes, [[ 'age' ]] );
 		} );
 	} );
 	describe( 'attempt resulting in value change', () => {
-		let onChangeMock : Listener;
+		let onChangeMock : jest.Mock;
 		let registered : Value["registered"];
 		let changes : Changes<Value>;
 		beforeAll(() => {
@@ -96,12 +96,23 @@ describe( 'setValue(...)', () => {
 		test( 'sends value change notifications', () => {
 			expect( onChangeMock ).toHaveBeenCalledTimes( 1 );
 		} );
-		test( 'communicates proposed changes as part of value change notification', () => {
-			expect( onChangeMock ).toHaveBeenCalledWith( changes );
+		test( 'communicates the final resulting changes and affected paths as part of value change notification', () => {
+			expect( onChangeMock ).toHaveBeenCalledWith(
+				{
+					registered : {
+						day: 30,
+						year: 2020
+					}
+				},
+				[
+					[ 'registered', 'day' ],
+					[ 'registered', 'year' ]
+				]
+			)
 		} );
 	} );
 	describe( 'attempt resulting in no value change', () => {
-		let onChangeMock : Listener;
+		let onChangeMock : jest.Mock;
 		let registered : Value["registered"];
 		beforeAll(() => {
 			onChangeMock = jest.fn();
@@ -153,7 +164,7 @@ describe( 'setValue(...)', () => {
 		} );
 		describe( 'using indexed object to update array at specific indexes', () => {
 			let changes : Changes<Value>;
-			let onChangeMock : Listener;
+			let onChangeMock : jest.Mock;
 			let origFriendsSlice : Value["friends"];
 			beforeAll(() => {
 				origFriendsSlice = clonedeep( value.friends );
@@ -175,19 +186,35 @@ describe( 'setValue(...)', () => {
 			} );
 			test( 'updates value with new changes', () => {
 				expect( value.friends?.[ 0 ] ).toEqual( origFriendsSlice![ 0 ] ); // remains untouched
-				expect( value.friends?.[ 1 ].name.first ).toBe( changes.friends[ 1 ].name.first );
-				expect( value.friends?.[ 2 ] ).toEqual( changes.friends[ -1 ] );
+				expect( value.friends?.[ 1 ].name.first ).toBe(( changes as SourceData ).friends[ 1 ].name.first );
+				expect( value.friends?.[ 2 ] ).toEqual(( changes as SourceData ).friends[ -1 ] );
 			} );
 			test( 'recognizes update by negative indexing', () => {
-				expect( value.friends?.[ 2 ] ).toEqual( changes.friends[ -1 ] );
+				expect( value.friends?.[ 2 ] ).toEqual(( changes as SourceData ).friends[ -1 ] );
 			} );
 			test( 'notifies listeners of value changes', () => {
 				expect( onChangeMock ).toHaveBeenCalledTimes( 1 );
-				expect( onChangeMock ).toHaveBeenCalledWith( changes );
+				expect( onChangeMock ).toHaveBeenCalledWith({
+					friends: [
+						undefined,
+						{ name: { first: 'Virginia' } },
+						{ id: 5, name: {
+							first: 'Kathy', last: 'Smith',
+						} }
+					]
+				}, [
+					["friends", 1, "name", "first"],
+					["friends", 2, "id"],
+					["friends", 2, "name", "first"],
+					["friends", 2, "name", "last"]
+				]);
 			} );
 		} );
 		describe( 'using indexed object to create new array entry', () => {
-			let newEntryIndex, changes, onChangeMock, origFriendsSlice;
+			let newEntryIndex : number;
+			let changes : Value;
+			let onChangeMock : jest.Mock;
+			let origFriendsSlice : SourceData[ "friends" ];
 			beforeAll(() => {
 				origFriendsSlice = clonedeep( value.friends );
 				newEntryIndex = origFriendsSlice.length + 2;
@@ -197,7 +224,7 @@ describe( 'setValue(...)', () => {
 							id: newEntryIndex,
 							name: { first: 'Rudie', last: 'Carson' }
 						}
-					}
+					} as typeof origFriendsSlice
 				};
 				onChangeMock = jest.fn();
 				setValue( value, changes, onChangeMock );
@@ -217,15 +244,28 @@ describe( 'setValue(...)', () => {
 				}
 			} );
 			test( 'places new entry at the referenced index', () => {
-				expect( value.friends?.[ newEntryIndex ] ).toEqual( changes.friends[ newEntryIndex ] );
+				expect( value.friends?.[ newEntryIndex ] ).toEqual( changes.friends?.[ newEntryIndex ] );
 			} );
 			test( 'notifies listeners of value changes', () => {
 				expect( onChangeMock ).toHaveBeenCalledTimes( 1 );
-				expect( onChangeMock ).toHaveBeenCalledWith( changes );
+				expect( onChangeMock ).toHaveBeenCalledWith({
+					friends: [
+						...( value.friends as Array<unknown> ).slice( 0, -1 ),
+						{
+							id: 5,
+							name: {
+								first: 'Rudie',
+								last: 'Carson',
+							}
+						}
+					]
+				}, [[ 'friends' ]] );
 			} );
 		} );
 		describe( 'using indexed object resulting in no new change', () => {
-			let changes, onChangeMock, origPlacesSlice;
+			let changes : Value;
+			let onChangeMock : Listener;
+			let origPlacesSlice : SourceData[ "history" ][ "places" ];
 			beforeAll(() => {
 				origPlacesSlice = clonedeep( value.history?.places );
 				changes = {
@@ -235,7 +275,7 @@ describe( 'setValue(...)', () => {
 								city: 'Topeka',
 								year: '1997 - 2002'
 							}
-						}
+						} as unknown as typeof origPlacesSlice
 					}
 				};
 				onChangeMock = jest.fn();
@@ -256,10 +296,11 @@ describe( 'setValue(...)', () => {
 			} );
 		} );
 		describe( 'existing and incoming arrays of equal lengths', () => {
-			let onChangeMock, value;
+			let onChangeMock : jest.Mock;
+			let value : SourceData;
 			beforeAll(() => { onChangeMock = jest.fn() });
 			beforeEach(() => { value = createSourceData() });
-			afterEach(() => onChangeMock.mockClear());
+			afterEach(() => { onChangeMock.mockClear() });
 			test( 'results in no change when equal', () => {
 				const friends = value.friends;
 				setValue( value, { friends }, onChangeMock );
@@ -284,8 +325,9 @@ describe( 'setValue(...)', () => {
 			} );
 		} );
 		describe( 'incoming array < existing array', () => {
-			let changes, onChangeMock;
-			let origFriendsSlice;
+			let changes : Value;
+			let onChangeMock : jest.Mock;
+			let origFriendsSlice : SourceData[ "friends" ];
 			beforeAll(() => {
 				origFriendsSlice = clonedeep( value.friends );
 				changes = { friends: [ origFriendsSlice[ 2 ] ] };
@@ -294,7 +336,7 @@ describe( 'setValue(...)', () => {
 			});
 			afterAll(() => { value.friends = origFriendsSlice });
 			test( 'truncates existing array to new array size', () => {
-				expect( value.friends ).toHaveLength( changes.friends.length );
+				expect( value.friends ).toHaveLength(( changes as SourceData ).friends.length );
 				expect( value.friends?.length ).toBeLessThan( origFriendsSlice.length );
 			} );
 			test( 'updates value with new changes', () => {
@@ -302,12 +344,21 @@ describe( 'setValue(...)', () => {
 			} );
 			test( 'notifies listeners of value changes', () => {
 				expect( onChangeMock ).toHaveBeenCalledTimes( 1 );
-				expect( onChangeMock ).toHaveBeenCalledWith( changes );
+				expect( onChangeMock ).toHaveBeenCalledWith({
+					friends: [{
+						id: 2,
+						name: {
+							first: 'Carey',
+							last: 'Osborne'
+						}
+					}]
+				}, [[ 'friends' ]]);
 			} );
 		} );
 		describe( 'incoming array is a subset of existing array', () => {
-			let changes, onChangeMock;
-			let origFriendsSlice;
+			let changes : Value;
+			let onChangeMock : jest.Mock;
+			let origFriendsSlice : SourceData[ "friends" ];
 			beforeAll(() => {
 				origFriendsSlice = clonedeep( value.friends );
 				changes = { friends: origFriendsSlice.slice( 0, 2 ) }; // takes 1st 2 entries and omits the last
@@ -316,7 +367,7 @@ describe( 'setValue(...)', () => {
 			});
 			afterAll(() => { value.friends = origFriendsSlice });
 			test( 'truncates existing array to new array size', () => {
-				expect( value.friends ).toHaveLength( changes.friends.length );
+				expect( value.friends ).toHaveLength(( changes as SourceData ).friends.length );
 				expect( value.friends?.length ).toBeLessThan( origFriendsSlice.length );
 			} );
 			test( 'updates value with new changes', () => {
@@ -324,22 +375,29 @@ describe( 'setValue(...)', () => {
 			} );
 			test( 'notifies listeners of the removed last entry', () => {
 				expect( onChangeMock ).toHaveBeenCalledTimes( 1 );
-				expect( onChangeMock ).toHaveBeenCalledWith( changes );
+				expect( onChangeMock ).toHaveBeenCalledWith({
+					friends: [{
+						id: 0, name: { first: 'Pollard', last: 'Hunter' }
+					}, {
+						id: 1, name: { first: 'Holly', last: 'Roberson' }
+					}]
+				}, [[ 'friends' ]]);
 			} );
 		} );
 		describe( 'incoming array > existing array', () => {
 			describe( 'where incoming array is completely different from existing array', () => {
-				let changes, onChangeMock;
-				let origFriendsSlice;
+				let changes : Value;
+				let onChangeMock : jest.Mock;
+				let origFriendsSlice : SourceData[ "friends" ];
 				beforeAll(() => {
 					origFriendsSlice = clonedeep( value.friends );
 					changes = { friends: [] };
 					for( let i = 7; --i; ) {
-						changes.friends.push({
-							id: expect.any( Number ),
+						changes.friends!.push({
+							id: expect.any( Number ) as unknown as number,
 							name: {
-								first: expect.any( String ),
-								last: expect.any( String )
+								first: expect.any( String ) as unknown as string,
+								last: expect.any( String ) as unknown as string
 							}
 						});
 					}
@@ -348,21 +406,40 @@ describe( 'setValue(...)', () => {
 				});
 				afterAll(() => { value.friends = origFriendsSlice });
 				test( 'increases existing array size to fit new array items', () => {
-					expect( value.friends ).toHaveLength( changes.friends.length );
+					expect( value.friends ).toHaveLength(( changes as SourceData ).friends.length );
 					expect( value.friends?.length ).toBeGreaterThan( origFriendsSlice.length );
 				} );
 				test( 'updates value with new changes', () => {
 					expect( value.friends ).toEqual( changes.friends );
 				} );
 				test( 'notifies listeners of total value slice replacement', () => {
-					const replacedFriendsSlice = {};
-					changes.friends.forEach(( f, i ) => { replacedFriendsSlice[ i ] = f });
+					const replacedFriendsSlice = {} as typeof origFriendsSlice;
+					changes.friends!.forEach(( f, i ) => { replacedFriendsSlice[ i ] = f });
 					expect( onChangeMock ).toHaveBeenCalledTimes( 1 );
-					expect( onChangeMock ).toHaveBeenCalledWith( changes );
+					expect( onChangeMock ).toHaveBeenCalledWith({
+						friends: [{
+							id: expect.any( Number ), name: { first: expect.any( String ), last: expect.any( String ) }
+						}, {
+							id: expect.any( Number ), name: { first: expect.any( String ), last: expect.any( String ) }
+						}, {
+							id: expect.any( Number ), name: {first: expect.any( String ), last: expect.any( String )}
+						}, {
+							id: expect.any( Number ), name: {first: expect.any( String ), last: expect.any( String )}
+						}, {
+							id: expect.any( Number ), name: {first: expect.any( String ), last: expect.any( String )}
+						}, {
+							id: expect.any( Number ), name: {first: expect.any( String ), last: expect.any( String )}
+						}]
+					}, [["friends"]]);
 				} );
 			} );
 			describe( 'where incoming array contains existing array entries at the matching indexes', () => {
-				let changes, onChangeMock, lastNewValueEntry, origFriendsSlice, originalNewValueEntry0, originalNewValueEntry1;
+				let changes : SourceData;
+				let onChangeMock : jest.Mock;
+				let lastNewValueEntry : SourceData[ "friends" ][ 0 ];
+				let origFriendsSlice : SourceData[ "friends" ];
+				let originalNewValueEntry0 : SourceData[ "friends" ][ 0 ];
+				let originalNewValueEntry1 : SourceData[ "friends" ][ 0 ];
 				beforeAll(() => {
 					origFriendsSlice = clonedeep( value.friends );
 					originalNewValueEntry0 = {
@@ -373,14 +450,14 @@ describe( 'setValue(...)', () => {
 						}
 					};
 					originalNewValueEntry1 = {
-						id: expect.any( Number ),
+						id: expect.any( Number ) as unknown as number,
 						name: {
-							first: expect.any( String ),
-							last: expect.any( String )
+							first: expect.any( String ) as unknown as string,
+							last: expect.any( String ) as unknown as string
 						}
 					};
 					lastNewValueEntry = origFriendsSlice[ 0 ];
-					changes = { friends: clonedeep( origFriendsSlice ) };
+					changes = { friends: clonedeep( origFriendsSlice ) } as SourceData;
 					changes.friends[ 0 ] = originalNewValueEntry0;
 					changes.friends.push( originalNewValueEntry1 );
 					changes.friends.push( lastNewValueEntry );
@@ -402,13 +479,24 @@ describe( 'setValue(...)', () => {
 				} );
 				test( 'notifies listeners of updated array entries', () => {
 					expect( onChangeMock ).toHaveBeenCalledTimes( 1 );
-					expect( onChangeMock ).toHaveBeenCalledWith( changes );
+					expect( onChangeMock ).toHaveBeenCalledWith({
+						friends: [
+							{ id: 15, name: { first: 'Sue', last: 'Jones' } },
+							{ id: 1, name: { first: 'Holly', last: 'Roberson' } },
+							{ id: 2, name: { first: 'Carey', last: 'Osborne' } },
+							{ id: expect.any( Number ), name: {
+								first: expect.any( String ),
+								last: expect.any( String )
+							} },
+							{ id: 0, name: { first: 'Pollard', last: 'Hunter' } }
+						]
+					}, [[ 'friends' ]]);
 				} );
 			} );
 		} );
 	} );
 	describe( 'summary setValue', () => {
-		let value;
+		let value : SourceData;
 		beforeAll(() => { value = createSourceData() });
 		describe( `by the '${ CLEAR_TAG }' tag property key`, () => {
 			test( 'sets the entire value to its default value', () => {
@@ -602,7 +690,7 @@ describe( 'setValue(...)', () => {
 			} );
 		} );
 		describe( `by the '${ MOVE_TAG }' tag property key`, () => {
-			let value;
+			let value : SourceData;
 			beforeAll(() => { value = createSourceData() });
 			test( 'moves contiguous array items(s) from one index to another', () => {
 				const _value : Value = createSourceData();
@@ -636,7 +724,11 @@ describe( 'setValue(...)', () => {
 					[ true ], [ [] ], [ [ 3 ] ], [ [ true, true ] ], [ [ 4, true ] ], [ [ 1.2, 0.5 ] ],
 					[ { 0: 2, 1: 1 } ]
 				])( 'throws `TypeError` for arguments fitting this description: %p', args => expect(
-					() => setValue( value, { friends: { [ MOVE_TAG ]: args } } )
+					() => setValue( value, {
+						friends: {
+							[ MOVE_TAG ]: args
+						} as unknown as  SourceData[ "friends" ] 
+					} as Changes<Value> )
 				).toThrow( TypeError ) );
 			} );
 			describe( 'optional third argumemt', () => {
@@ -668,7 +760,7 @@ describe( 'setValue(...)', () => {
 				} );
 			} );
 			describe( 'counting from end of value array', () => {
-				let calcExpected;
+				let calcExpected : ( indexes : Array<number> ) => SourceData;
 				beforeAll(() => {
 					value = createSourceData();
 					calcExpected = indexes => ({
@@ -687,7 +779,8 @@ describe( 'setValue(...)', () => {
 				} );
 			} );
 			describe( 'case for rnon-existent properties', () => {
-				let _value, onChangeMock;
+				let _value : SourceData;
+				let onChangeMock : jest.Mock;
 				beforeAll(() => {
 					_value = createSourceData();
 					onChangeMock = jest.fn();
@@ -713,7 +806,8 @@ describe( 'setValue(...)', () => {
 			} );
 		} );
 		describe( `by the '${ PUSH_TAG }' tag property key`, () => {
-			let value, newItems;
+			let value : SourceData;
+			let newItems : Array<any>;
 			beforeAll(() => {
 				newItems = [ expect.anything(), expect.anything() ];
 				value = createSourceData();
@@ -753,7 +847,11 @@ describe( 'setValue(...)', () => {
 					[ null ], [ undefined ], [ '' ], [ 'test' ], [ {} ],
 					[ { test: expect.anything() } ], [ true ], [ { 0: 2, 1: 1 } ]
 				])( 'throws `TypeError` for arguments fitting this description: %p', args => expect(
-					() => setValue( value, { friends: { [ PUSH_TAG ]: args } } )
+					() => setValue( value, {
+						friends: {
+							[ PUSH_TAG ]: args
+						} as unknown as SourceData[ "friends" ]
+					} as Changes<Value> )
 				).toThrow( TypeError ) );
 			} );
 			test( 'ignores empty array argument', () => {
@@ -858,9 +956,10 @@ describe( 'setValue(...)', () => {
 			} );
 		} );
 		describe( `by the '${ SET_TAG }' tag property key`, () => {
-			let newPhone, newTag0;
+			let newPhone : SourceData[ "phone" ];
+			let newTag0 : SourceData[ "tags" ][ 0 ];
 			beforeAll(() => {
-				newPhone = { area: '312', line: '1212', local: '644' };
+				newPhone = { area: '312', line: '1212', local: '644' } as SourceData[ "phone" ];
 				newTag0 = 'first item';
 			});
 			test( 'replaces value slice with new value', () => {
@@ -893,23 +992,25 @@ describe( 'setValue(...)', () => {
 				} );
 			} );
 			describe( 'using compute function', () => {
-				let _value, phoneArg, newPropArg;
+				let _value : SourceData;
+				let phoneArg : SourceData[ "phone" ];
+				let newPropArg : unknown;
 				beforeAll(() => {
 					_value = createSourceData();
 					setValue( _value, {
 						phone: {
-							[ SET_TAG ]: s => {
+							[ SET_TAG ]( s : SourceData[ "phone" ] ){
 								phoneArg = s;
 								return newPhone;
 							}
 						},
 						newProp: {
-							[ SET_TAG ]: s => {
+							[ SET_TAG ]( s : unknown ){
 								newPropArg = s;
 								return s;
 							}
 						}
-					} );
+					} as Changes<Value> );
 				});
 				test( 'replaces value slice with the return value', () => {
 					expect( _value ).toEqual({ ...value, newProp: newPropArg, phone: newPhone });
@@ -921,7 +1022,8 @@ describe( 'setValue(...)', () => {
 				} );
 			} );
 			describe( 'setting referenced top level properties', () => {
-				let _value, valueReplacement;
+				let _value : SourceData;
+				let valueReplacement : {};
 				beforeAll(() => {
 					valueReplacement = {
 						averageScore: 87, // new
@@ -939,19 +1041,19 @@ describe( 'setValue(...)', () => {
 				});
 				test( 'accepts ready-to-set data', () => {
 					_value = createSourceData();
-					setValue( _value, { [ SET_TAG ]: valueReplacement } );
+					setValue( _value, { [ SET_TAG ]: valueReplacement } as Changes<Value> );
 					expect( _value ).toEqual( valueReplacement );
 				});
 				describe( 'using compute function', () => {
-					let arg;
+					let arg : unknown;
 					beforeAll(() => {
 						_value = createSourceData();
 						setValue( _value, {
-							[ SET_TAG ]: s => {
+							[ SET_TAG ]( s :unknown ){
 								arg = s;
 								return valueReplacement;
 							}
-						} );
+						} as Changes<Value> );
 					});
 					test( 'accepts the function return value', () => {
 						expect( _value ).toEqual( valueReplacement );
@@ -987,7 +1089,7 @@ describe( 'setValue(...)', () => {
 					friends: 'NEW TEST FRIENDS',
 					name: { first: 'Priscilla', middle: 'Samantha', last: 'Williams' },
 					phone: { extension: 'x456' }, // ADDING `extension` to value.phone
-					tags: t => t.length > 3 ? t.slice( -2 ) : t
+					tags: ( t : Array<string> ) => t.length > 3 ? t.slice( -2 ) : t
 				};
 				setValue( _value, {
 					company: { [ SET_TAG ]: newValues.company },
@@ -1023,20 +1125,21 @@ describe( 'setValue(...)', () => {
 			} );
 		} );
 		describe( `by the '${ SPLICE_TAG }' tag property key`, () => {
-			let value, newItems;
-			/**
-			 * "x" arrayIndex entry signifies when to insert new item values into expected array.
-			 *
-			 * @type {(field: string, indexPositions: Array<number|"x">, newItems: any) => Array}
-			 */
-			let computeExpectedArray;
+			let value : SourceData;
+			let newItems : Array<any>;
+			// "x" arrayIndex entry signifies when to insert new item values into expected array.
+			let computeExpectedArray : (
+				field: keyof SourceData,
+				indexPositions: Array<number|"x">,
+				newItems: Array<unknown>
+			) => Array<unknown>;
 			beforeAll(() => {
 				newItems = [ expect.anything(), expect.anything() ];
 				value = createSourceData();
 				computeExpectedArray = ( field, indexPositions, newItems ) => indexPositions.reduce(( a, i ) => {
 					i === 'x'
-						? a.push( ...newItems )
-						: a.push( value[ field ][ i ] );
+						? ( a as Array<unknown> ).push( ...newItems )
+						: ( a as Array<unknown> ).push(( value[ field ] as Array<unknown> )[ i ]);
 					return a;
 				}, []);
 			});
@@ -1064,7 +1167,11 @@ describe( 'setValue(...)', () => {
 				test( 'only accepts an array value consisting of at least two integers', () => expect(
 					() => {
 						const v : Value = createSourceData();
-						setValue( v, { friends: { [ SPLICE_TAG ]: [ 0, 1 ] } } )
+						setValue( v, {
+							friends: {
+								[ SPLICE_TAG ]: [ 0, 1 ]
+							} as unknown as Value["friends"]
+						} )
 					}
 				).not.toThrow( TypeError ) );
 				test.each([
@@ -1072,7 +1179,11 @@ describe( 'setValue(...)', () => {
 					[ true ], [ [] ], [ [ 3 ] ], [ [ true, true ] ], [ [ 4, true ] ], [ [ 1.2, 0.5 ] ],
 					[ { 0: 2, 1: 1 } ]
 				])( 'throws `TypeError` for arguments fitting this description: %p', args => expect(
-					() => setValue( value, { friends: { [ SPLICE_TAG ]: args } } )
+					() => setValue( value, {
+						friends: {
+							[ SPLICE_TAG ]: args
+						} as unknown as Value["friends"]
+					} as Changes<Value> )
 				).toThrow( TypeError ) );
 			} );
 			describe( 'additional optional ...newItems variadic argumemt(s)', () => {
@@ -1130,7 +1241,11 @@ describe( 'setValue(...)', () => {
 					setValue( _value, { friends: { [ SPLICE_TAG ]: args } } );
 					expect( _value ).toEqual({
 						...value,
-						friends: computeExpectedArray( 'friends', expectedIndices, desc.length ? newItems : undefined )
+						friends: computeExpectedArray(
+							'friends',
+							expectedIndices as Array<number|'x'>,
+							( desc.length ? newItems : undefined ) as Array<unknown>
+						)
 					});
 				} );
 			} );
@@ -1157,10 +1272,19 @@ describe( 'setValue(...)', () => {
 			} );
 		} );
 		describe( 'on currently undefined value', () => {
-			let getShallowUpdate, getUpdate, onChange, value;
+			let value : SourceData & {testing? : {}};
+			function getShallowUpdate( tag : string ) : {};
+			function getShallowUpdate( tag : {} ) : {};
+			function getShallowUpdate( tag : any ) : {} {
+				return { testing: tag };
+			}
+			function getUpdate( tag : string ) : {};
+			function getUpdate( tag : {} ) : {};
+			function getUpdate( tag : any ) : {} {
+				return { testing: { value: tag } };
+			}
+			let onChange : ()=>void;
 			beforeAll(() => {
-				getShallowUpdate = tag => ({ testing: tag });
-				getUpdate = tag => ({ testing: { value: tag } });
 				onChange = () => {};
 				value = createSourceData();
 			});
@@ -1176,7 +1300,9 @@ describe( 'setValue(...)', () => {
 				${ { 1: CLEAR_TAG } }						| ${ 'in indexed-object payload' }			| ${ { value: [ undefined, undefined ] } }	
 				${ { places: [ CLEAR_TAG, CLEAR_TAG ] } }	| ${ 'in a nested payload' }				| ${ { value: { places: [ undefined, undefined ] } } }
 				${ { places: CLEAR_TAG } }					| ${ 'as a string in a nested payload' }	| ${ { value: {} } }
-			`( `using '${ CLEAR_TAG }' tag property key $desc`, ({ tag, expected } : Record<string, unknown> ) => {
+			`( `using '${ CLEAR_TAG }' tag property key $desc`, ( input : Record<string, unknown> ) => {
+				let expected = input.expected; 
+				let tag = input.tag as string;
 				test( 'sets shallowly embedded tag', () => {
 					setValue( value, getShallowUpdate( tag ), onChange );
 					expect( value.testing ).toEqual( ( expected as ExpectVal ).value );
@@ -1204,7 +1330,7 @@ describe( 'setValue(...)', () => {
 				} );
 			} );
 			describe( `using '${ DELETE_TAG }' tag property key`, () => {
-				let tag;
+				let tag : { "@@DELETE": string[] };
 				beforeAll(() => { tag = { [ DELETE_TAG ]: [ 'area', 'country', 'line' ] } });
 				test( 'sets shallowly embedded tag', () => {
 					setValue( value, getShallowUpdate( tag ), onChange );
@@ -1232,7 +1358,7 @@ describe( 'setValue(...)', () => {
 				} );
 			} );
 			describe( `using '${ MOVE_TAG }' tag property key`, () => {
-				let tag;
+				let tag : { "@@MOVE": [number, number ] };
 				beforeAll(() => { tag = { [ MOVE_TAG ]: [ 0, 2 ] } });
 				test( 'sets shallowly embedded tag', () => {
 					setValue( value, getShallowUpdate( tag ), onChange );
@@ -1260,7 +1386,8 @@ describe( 'setValue(...)', () => {
 				} );
 			} );
 			describe( `using '${ PUSH_TAG }' tag property key`, () => {
-				let tag, _value;
+				let _value : Array<unknown>;
+				let tag : { "@@PUSH": typeof _value };
 				beforeAll(() => {
 					_value = [ { prop: expect.anything() }, expect.anything() ];
 					tag = { [ PUSH_TAG ]: _value };
@@ -1291,7 +1418,8 @@ describe( 'setValue(...)', () => {
 				} );
 			} );
 			describe( `using '${ REPLACE_TAG }' tag property key`, () => {
-				let tag, _value;
+				let _value : unknown;
+				let tag : { "@@REPLACE": typeof _value };
 				beforeAll(() => {
 					_value = 'REPLACEMENT STATE VALUE';
 					tag = { [ REPLACE_TAG ]: _value };
@@ -1322,7 +1450,8 @@ describe( 'setValue(...)', () => {
 				} );
 			} );
 			describe( `using '${ SET_TAG }' tag property key`, () => {
-				let tag, _value;
+				let _value : unknown;
+				let tag : { "@@SET": typeof _value };
 				beforeAll(() => {
 					_value = 'STATE UPDATE VALUE';
 					tag = { [ SET_TAG ]: _value }
@@ -1353,7 +1482,8 @@ describe( 'setValue(...)', () => {
 				} );
 			} );
 			describe( `using computed '${ SET_TAG }' tag property key`, () => {
-				let expected, tag;
+				let expected: unknown;
+				let tag : { "@@SET": ( p : typeof expected ) => typeof expected };
 				beforeAll(() => {
 					expected = 'COMPUTED STATE UPDATE VALUE';
 					tag = { [ SET_TAG ]: prev => prev ?? expected };
@@ -1384,7 +1514,9 @@ describe( 'setValue(...)', () => {
 				} );
 			} );
 			describe( `using '${ SPLICE_TAG }' tag property key`, () => {
-				let data, dataTag, tag;
+				let data : unknown;
+				let dataTag : { "@@SPLICE": [ number, number, typeof data ] };
+				let tag : { "@@SPLICE": [ number, number ] };
 				beforeAll(() => {
 					data = { color: 'blue' };
 					dataTag = { [ SPLICE_TAG ]: [ 1, 1, data ] };
@@ -1480,9 +1612,9 @@ describe( 'setValue(...)', () => {
 				SET_TAG_ON_NEW_PROPS_A: { [ SET_TAG ]: NEW_SET_TAG_VALUE },
 				SET_TAG_ON_NEW_PROPS_B: { value: { [ SET_TAG ]: NEW_SET_TAG_VALUE } },
 				SET_TAG_ON_NEW_PROPS_C: { value: { places: { [ SET_TAG ]: NEW_SET_TAG_VALUE } } },
-				SET_TAG_ON_NEW_PROPS_COMPUTED_A: { [ SET_TAG ]: prev => prev ?? NEW_SET_TAG_VALUE_COMPUTED },
-				SET_TAG_ON_NEW_PROPS_COMPUTED_B: { value: { [ SET_TAG ]: prev => prev ?? NEW_SET_TAG_VALUE_COMPUTED } },
-				SET_TAG_ON_NEW_PROPS_COMPUTED_C: { value: { places: { [ SET_TAG ]: prev => prev ?? NEW_SET_TAG_VALUE_COMPUTED } } },
+				SET_TAG_ON_NEW_PROPS_COMPUTED_A: { [ SET_TAG ]: ( prev : unknown ) => prev ?? NEW_SET_TAG_VALUE_COMPUTED },
+				SET_TAG_ON_NEW_PROPS_COMPUTED_B: { value: { [ SET_TAG ]: ( prev : unknown ) => prev ?? NEW_SET_TAG_VALUE_COMPUTED } },
+				SET_TAG_ON_NEW_PROPS_COMPUTED_C: { value: { places: { [ SET_TAG ]: ( prev : unknown ) => prev ?? NEW_SET_TAG_VALUE_COMPUTED } } },
 				SPLICE_TAG_ON_NEW_PROPS_A: { [ SPLICE_TAG ]: [ 1, 1 ] },
 				SPLICE_TAG_ON_NEW_PROPS_B: { value: { [ SPLICE_TAG ]: [ 1, 1 ] } },
 				SPLICE_TAG_ON_NEW_PROPS_C: { value: { places: { [ SPLICE_TAG ]: [ 1, 1 ] } } },
@@ -1502,7 +1634,7 @@ describe( 'setValue(...)', () => {
 					'Deedee',
 					{ [ CLEAR_TAG ]: expect.anything() },
 					'Momo',
-					{ [ SET_TAG ]: s => s },
+					{ [ SET_TAG ]: ( s : unknown ) => s },
 					'Lala',
 					'Lulu',
 					'Chuchu'
@@ -1510,7 +1642,7 @@ describe( 'setValue(...)', () => {
 				tags: {
 					'-1': { [ SET_TAG ]: 'new last item' },
 					1: { [ REPLACE_TAG ]: 'new 2nd item' },
-					4: { [ SET_TAG ]: s => `${ s }_${ s.length }` }
+					4: { [ SET_TAG ]: ( s : string ) => `${ s }_${ s.length }` }
 				}
 			};
 			setValue( _value, changes as unknown as Changes<Value>, onChangeMock );
@@ -1546,10 +1678,99 @@ describe( 'setValue(...)', () => {
 				SPLICE_TAG_ON_NEW_PROPS_B: { value: [] },
 				SPLICE_TAG_ON_NEW_PROPS_C: { value: { places: [] } }
 			});
-			const arg = onChangeMock.mock.calls[ 0 ][ 0 ];
-			expect( arg ).toBe( changes );
-			expect( arg ).toEqual( changes );
-			expect( arg ).toStrictEqual( changes );
+			expect( onChangeMock ).toBeCalledTimes( 1 );
+        	expect( onChangeMock ).toBeCalledWith({
+				age: 97,
+				faveColors: [
+					'red',      'orange',
+					'yellow',   'blue',
+					'navy',     'midnight blue',
+					'indigo',   'green',
+					'sky blue', 'silver',
+					'gold',     'bronze'
+				],
+				CLEAR_TAG_ON_NEW_PROPS_B: { value: undefined },
+				CLEAR_TAG_ON_NEW_PROPS_C: { value: { places: undefined } },
+				CLEAR_TAG_ON_NEW_PROPS_D: { value: { places: [ undefined, undefined ] } },
+				DELETE_TAG_ON_NEW_PROPS_B: { value: undefined },
+				DELETE_TAG_ON_NEW_PROPS_C: { value: { places: undefined } },
+				MOVE_TAG_ON_NEW_PROPS_B: { value: [] },
+				MOVE_TAG_ON_NEW_PROPS_C: { value: { places: [] } },
+				PUSH_TAG_ON_NEW_PROPS_A: [ { prop: 55 }, 22 ],
+				PUSH_TAG_ON_NEW_PROPS_B: { value: [ { prop: 55 }, 22 ] },
+				PUSH_TAG_ON_NEW_PROPS_C: { value: { places: [ { prop: 55 }, 22 ] } },
+				REPLACE_TAG_ON_NEW_PROPS_A: 'REPLACEMENT STATE VALUE',
+				REPLACE_TAG_ON_NEW_PROPS_B: { value: 'REPLACEMENT STATE VALUE' },
+				REPLACE_TAG_ON_NEW_PROPS_C: { value: { places: 'REPLACEMENT STATE VALUE' } },
+				SET_TAG_ON_NEW_PROPS_A: 'STATE UPDATE VALUE',
+				SET_TAG_ON_NEW_PROPS_B: { value: 'STATE UPDATE VALUE' },
+				SET_TAG_ON_NEW_PROPS_C: { value: { places: 'STATE UPDATE VALUE' } },
+				SET_TAG_ON_NEW_PROPS_COMPUTED_A: 'COMPUTED STATE UPDATE VALUE',
+				SET_TAG_ON_NEW_PROPS_COMPUTED_B: { value: 'COMPUTED STATE UPDATE VALUE' },
+				SET_TAG_ON_NEW_PROPS_COMPUTED_C: { value: { places: 'COMPUTED STATE UPDATE VALUE' } },
+				SPLICE_TAG_ON_NEW_PROPS_A: [],
+				SPLICE_TAG_ON_NEW_PROPS_B: { value: [] },
+				SPLICE_TAG_ON_NEW_PROPS_C: { value: { places: [] } },
+				friends: [
+           			{ id: 2, name: { first: 'Carey', last: 'Osborne' } },
+					{ name: { first: 'Mary' } },
+					undefined
+				],
+				history: {
+					places: [{
+        				city: 'Atlanta',
+        				country: 'US',
+        				state: 'GA',
+        				year: '2008'
+					}]
+				},
+				pets: [
+					'Titi', 'Deedee',
+					'',     'Momo',
+					'Fifi', 'Lala',
+					'Lulu', 'Chuchu'
+				],
+				tags: [
+					undefined,
+					'new 2nd item',
+					undefined,
+					undefined,
+					'ullamco_7',
+					undefined,
+					'new last item'
+				]
+        	}, [
+				[ 'age' ],
+				[ 'faveColors' ],
+				[ 'CLEAR_TAG_ON_NEW_PROPS_B' ],
+				[ 'CLEAR_TAG_ON_NEW_PROPS_C' ],
+				[ 'CLEAR_TAG_ON_NEW_PROPS_D' ],
+				[ 'DELETE_TAG_ON_NEW_PROPS_B' ],
+				[ 'DELETE_TAG_ON_NEW_PROPS_C' ],
+				[ 'MOVE_TAG_ON_NEW_PROPS_B' ],
+				[ 'MOVE_TAG_ON_NEW_PROPS_C' ],
+				[ 'PUSH_TAG_ON_NEW_PROPS_A' ],
+				[ 'PUSH_TAG_ON_NEW_PROPS_B' ],
+				[ 'PUSH_TAG_ON_NEW_PROPS_C' ],
+				[ 'REPLACE_TAG_ON_NEW_PROPS_A' ],
+				[ 'REPLACE_TAG_ON_NEW_PROPS_B' ],
+				[ 'REPLACE_TAG_ON_NEW_PROPS_C' ],
+				[ 'SET_TAG_ON_NEW_PROPS_A' ],
+				[ 'SET_TAG_ON_NEW_PROPS_B' ],
+				[ 'SET_TAG_ON_NEW_PROPS_C' ],
+				[ 'SET_TAG_ON_NEW_PROPS_COMPUTED_A' ],
+				[ 'SET_TAG_ON_NEW_PROPS_COMPUTED_B' ],
+				[ 'SET_TAG_ON_NEW_PROPS_COMPUTED_C' ],
+				[ 'SPLICE_TAG_ON_NEW_PROPS_A' ],
+				[ 'SPLICE_TAG_ON_NEW_PROPS_B' ],
+				[ 'SPLICE_TAG_ON_NEW_PROPS_C' ],
+				[ 'friends' ],
+				[ 'history', 'places' ],
+				[ 'pets' ],
+				[ 'tags', 1 ],
+				[ 'tags', 4 ],
+				[ 'tags', 6 ]
+        	]);
 		} );
 		test( `allows '${ REPLACE_TAG } as an alias for '${ SET_TAG }' without the compute function`, () => {
 			const value1 : Value = createSourceData();
@@ -1564,7 +1785,7 @@ describe( 'setValue(...)', () => {
 			const value1 : Value = createSourceData();
 			const value2 : Value = createSourceData();
 			const newBalance = 'TEST_BALANCE';
-			const computeNewBalance = s => newBalance;
+			const computeNewBalance = ( s : unknown ) => newBalance;
 			setValue( value1, { balance: { [ REPLACE_TAG ]: computeNewBalance } } );
 			setValue( value2, { balance: { [ SET_TAG ]: computeNewBalance } } );
 			expect( value1 ).toEqual({ ...value, balance: computeNewBalance });

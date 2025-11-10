@@ -273,7 +273,7 @@ function setValue<T extends Value>(
 
 function distillChanges<T extends object>(
 	source : T,
-	changedPaths : MapIterator<KeyType[]>
+	changedPaths : Array<Array<KeyType>>
 ) : ChangeInfo {
 	let propertyPathMap : {[x:string]: Array<KeyType>} = {};
 	for( let path of changedPaths ) {

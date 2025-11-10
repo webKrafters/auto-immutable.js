@@ -1,5 +1,6 @@
 import type {
 	BaseType,
+	GetElementType,
 	KeyType,
 	TagCommand,
 	TagType,
@@ -11,23 +12,29 @@ type Predicate = (
 	value : Value,
 	valueKey : string,
 	stats : Stats
-) => boolean
+) => boolean;
 
-type TaggedChanges<
-	T extends Array<any> | Value,
-	K extends keyof T,
-	TAG extends TagType
-> = Array<TagCommand<TAG, T> | BaseType> | Partial<T & {[P in K]: TagCommand<TAG, T> & Value}>
+type IndexedChange<
+	A extends Array<GetElementType<A>>,
+	I extends keyof A = keyof A
+> = A[ I ]|TagCommand<TagType, A, I>;
+
+export type TaggedChanges<T extends Array<GetElementType<T>> | Value> = Partial<
+	{[K in keyof T]: T[ K ]|TagCommand<TagType, T, K>} | (
+		T extends Array<GetElementType<T>>
+			? {[index : string]: IndexedChange<T>}
+			: {[T in TagType]: TagCommand<T, Value, keyof Value>}
+	)
+>;
 
 type TagFunction = <
-	T extends Array<any> | Value,
-	K extends keyof T,
-	TAG extends TagType
+	T extends Array<GetElementType<T>> | Value,
+	K extends keyof T
 >(
 	value : T,
 	valueKey : K,
 	stats : Stats,
-	changes? : TaggedChanges<T, K, TAG>
+	changes? : TaggedChanges<T>
 ) => void;
 
 import isEmpty from 'lodash.isempty';
@@ -132,7 +139,7 @@ export const $delete : TagFunction = ( value, valueKey, stats, changes ) => {
 			addToStatsTable([ valueKey, k ], stats );
 			changed = true;
 		}
-		changed && addToStatsTable([ valueKey ], stats );;
+		changed && addToStatsTable([ valueKey ], stats );
 		return finish();
 	}
 	const currLen = currValue.length;
