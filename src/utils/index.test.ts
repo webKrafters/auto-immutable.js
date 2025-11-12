@@ -9,7 +9,12 @@ import '../test-artifacts/suppress-render-compat';
 
 import * as utils from '.';
 
-describe( 'utils module', () => {
+/* @debug */
+// "(\w+)": --- $1:
+// Any<(\w+)> --- expect.any( $1 ) //
+// console.info( onChangeMock.mock.calls[ 0 ] );
+describe( '1xxxx', () => {
+// describe( 'utils module', () => {
 	describe( 'arrangePropertyPaths(...)', () => {
 		describe( 'subset propertyPaths', () => {
 			let actual : Array<string>;

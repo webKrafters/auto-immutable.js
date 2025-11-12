@@ -139,13 +139,13 @@ function resolveTags(
 ) : Array<TagType> {
 	const resolvedTags : Array<TagType> = [];
 	if( isClosedTag( changes[ valueKey ] ) ) {
-		changes[ valueKey ] = { [ changes[ valueKey ] ]: null };
+		changes[ valueKey ] = { [ changes[ valueKey ] as string ]: null };
 	}
 	if( !isDataContainer( changes[ valueKey ] ) ) { return resolvedTags }
 	if( !( valueKey in value ) && isArrayTaggedPayload( changes[ valueKey ] ) ) {
 		value[ valueKey ] = [];
 	}
-	for( const k in changes[ valueKey ] ) {
+	for( const k in changes[ valueKey ] as any ) {
 		if( !( valueKey in ( changes as object ) ) ) { break }
 		if( isClosedTag( changes[ valueKey ][ k ] ) ) {
 			changes[ valueKey ][ k ] = {
@@ -249,11 +249,9 @@ function setPlainObject( value, changes, rootKey, stats ) : void {
 	stats.currentPathToken.pop();
 }
 
-function setValue<T extends Value>(
-	value : T,
-	changes : Changes<T>,
-	onValueChange? : Listener
-) {
+function setValue<T extends Value>( value : T, changes : Array<Changes<T>>, onValueChange? : Listener ) : void;
+function setValue<T extends Value>( value : T, changes : Changes<T>, onValueChange? : Listener ) : void;
+function setValue<T extends Value>( value, changes, onValueChange? ) : void {
 	const stats = new Stats();
 	if( !Array.isArray( changes ) ) {
 		set( { value }, { value: clonedeep( changes ) }, stats );

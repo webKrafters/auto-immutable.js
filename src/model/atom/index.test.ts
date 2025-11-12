@@ -7,7 +7,12 @@ import {
 
 import Atom from '.';
 
-describe( 'Atom class', () => {
+/* @debug */
+// "(\w+)": --- $1:
+// Any<(\w+)> --- expect.any( $1 ) //
+// console.info( onChangeMock.mock.calls[ 0 ] );
+describe( '1xxxx', () => {
+// describe( 'Atom class', () => {
 	/** @type {Atom} */
 	let atom;
 	beforeAll(() => { atom = new Atom() })

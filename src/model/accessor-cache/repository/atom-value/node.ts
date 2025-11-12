@@ -92,7 +92,6 @@ class AtomNode<T extends Value>{
 	addAccessor( accessorId : number ) { return this._atom.connect( accessorId ) }
 
 	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
-	@activeNodesOnly
 	findActiveNodeAt( fullPath : Array<string> ) {
 		const node = this._findNodeAt( fullPath );
 		return node?.isActive ? node : null;

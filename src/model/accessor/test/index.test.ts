@@ -34,7 +34,12 @@ function getFakeAtomNodeFactory() {
 	} as unknown as AtomNode<{}> );
 };
 
-describe( 'Accessor class', () => {
+/* @debug */
+// "(\w+)": --- $1:
+// Any<(\w+)> --- expect.any( $1 ) //
+// console.info( onChangeMock.mock.calls[ 0 ] );
+describe( '1xxxx', () => {
+// describe( 'Accessor class', () => {
 	let sourceIds = [ 1, 2, 3, 4 ];
 	describe( 'properties', () => {
 		let accessor : Accessor<{}>;
