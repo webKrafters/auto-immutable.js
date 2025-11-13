@@ -1,6 +1,8 @@
 import dotize from '@webkrafters/path-dotize';
 import { GLOBAL_SELECTOR } from '../../../../constants';
 
+const SPLIT_PTN = /\./g;
+
 export interface PathIdInfo {
 	sanitizedPathId : number;
 	sourcePathId : number;
@@ -53,7 +55,7 @@ class PathRepository {
 	}
 
 	getPathTokensAt( sanitizedPathId : number ) {
-		return this._sanitizedIdToTokenization[ sanitizedPathId ].sanitizedTokens;
+		return this._sanitizedIdToTokenization[ sanitizedPathId ]?.sanitizedTokens;
 	}
 
 	getSourcePathAt( sourcePathId : number ) {
@@ -103,7 +105,7 @@ class PathRepository {
 		sanitizedPathId = this._reuseSanitizedIds.pop() ?? ++this._maxSanitizedId;
 		this._sanitizedToIdMap[ sanitized ] = sanitizedPathId;
 		this._sanitizedIdToTokenization[ sanitizedPathId ] = {
-			sanitizedTokens: sanitized.split( /\./g ),
+			sanitizedTokens: sanitized.split( SPLIT_PTN ),
 			sourceIds: [ sourcePathId ]
 		};
 		this._sourceIdToSanitizedMap[ sourcePathId ] = sanitized;

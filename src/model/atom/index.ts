@@ -1,6 +1,6 @@
 /**
  * An atom represents an entry for each individual property\
- * path of the value still in use by client components
+ * path of the value still in use by client components.
  */
 class Atom {
 

@@ -3,8 +3,13 @@ import type {
     Listener,
     UpdatePayload,
     UpdatePayloadArray,
+	UpdatePayloadArrayCore,
+	UpdatePayloadArrayCoreCloneable,
+	UpdatePayloadCore,
+	UpdatePayloadCoreCloneable,
     Value,
-    ValueObject
+    ValueObject,
+    ValueObjectCloneable
 } from '.';
 
 import setValue from './set';
@@ -28,6 +33,7 @@ export class Connection<T extends Value> {
 
     constructor( id : string, source: Source<Value> );
     constructor( id : string, source: Source<ValueObject> );
+    constructor( id : string, source: Source<ValueObjectCloneable> );
     constructor( id : string, source: Source<T> ){
         this._id = id;
         this._source = source;
@@ -66,9 +72,13 @@ export class Connection<T extends Value> {
             .get( this._source.key )
             .get( this._id, ...propertyPaths );
     }
-
+  
     set( changes : UpdatePayload<T>, onComplete? : Listener ) : void;
 	set( changes : UpdatePayloadArray<T>, onComplete? : Listener ) : void;
+	set( changes : UpdatePayloadArrayCore<T>, onComplete? : Listener ) : void;
+	set( changes : UpdatePayloadArrayCoreCloneable<T>, onComplete? : Listener ) : void;
+	set( changes : UpdatePayloadCore<T>, onComplete? : Listener ) : void;
+	set( changes : UpdatePayloadCoreCloneable<T>, onComplete? : Listener ) : void;
 	set( changes : Changes<T>, onComplete? : Listener ) : void;
     @invoke
     set( changes : any, onComplete: Listener = deps.noop ) : void {

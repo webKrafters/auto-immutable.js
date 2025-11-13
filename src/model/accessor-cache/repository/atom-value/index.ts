@@ -1,23 +1,6 @@
-import {
-	type ChangeInfo,
-	type Value
-} from '../../../..';
+import type { ChangeInfo, Value } from '../../../..';
 
-export interface PropertyOriginInfo {
-	exists: boolean;
-	value: any;
-};
-
-import set from 'lodash.set';
-
-import cloneDeep from '@webkrafters/clone-total';
 import get from '@webkrafters/get-property';
-
-import { GLOBAL_SELECTOR } from '../../../../constants';
-
-import { makeReadonly } from '../../../../utils';
-
-import { isAPrefixOfB } from './util';
 
 import PathRepository from '../paths';
 
@@ -41,6 +24,9 @@ class AtomValueRepository<T extends Value = Value> {
 	private _data : AtomNode<T>;
 	private _origin : T;
 	private _pathRepo : PathRepository;
+
+	get origin() { return this._origin }
+
 	constructor(
 		origin : T,
 		pathRepo : PathRepository
@@ -49,7 +35,7 @@ class AtomValueRepository<T extends Value = Value> {
 		this._origin = origin;
 		this._pathRepo = pathRepo;
 	}
-	get origin() { return this._origin }
+
 	addDataForAtomAt( propertyPath : string ) : void;
 	addDataForAtomAt(
 		/* split property path string */
@@ -80,7 +66,6 @@ class AtomValueRepository<T extends Value = Value> {
 			this._data.setValueAt( paths[ p ], get( changes, paths[ p ] )._value as Readonly<T> );
 		}
 	}
-
 }
 
 export default AtomValueRepository;

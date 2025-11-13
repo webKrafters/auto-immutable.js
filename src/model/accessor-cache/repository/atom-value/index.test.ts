@@ -5,9 +5,11 @@ import {
 	test
 } from '@jest/globals';
 
-import '../../../../test-artifacts/suppress-render-compat';
+import createSourceData from '../../../../test-artifacts/data/create-data-obj';
+import PathRepository from '../paths';
+import AtomValue from '.';
 
-import * as utils from '.';
+type SourceData = ReturnType<typeof createSourceData>;
 
 /* @debug */
 // "(\w+)": --- $1:
@@ -15,4 +17,29 @@ import * as utils from '.';
 // console.info( onChangeMock.mock.calls[ 0 ] );
 describe( '1xxxx', () => {
 // describe( 'AtomValue class', () => {
-} );
+	let sourceData : SourceData;
+	let atomValue : AtomValue<SourceData>;
+	let pathRepo : PathRepository;
+	beforeAll(() => {
+		sourceData = createSourceData();
+		pathRepo = new PathRepository();
+		atomValue = new AtomValue<SourceData>( sourceData, pathRepo );
+	});
+	test( 'creates an atom', () => expect( atomValue ).toBeInstanceOf( AtomValue ) );
+	describe( 'properties', () => {
+		describe( 'origin', () => {
+
+		} );
+	} );
+	describe( 'methods', () => {
+		describe( 'addDataForAtomAt(...)', () => {
+			test
+		} );
+		describe( 'getAtomAt(...)', () => {
+
+		} );
+		describe( 'mergeChanges(...)', () => {
+
+		} );
+	} );
+});

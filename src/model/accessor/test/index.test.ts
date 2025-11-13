@@ -1,13 +1,9 @@
 import {
-	afterAll,
-	beforeAll,
 	describe,
 	expect,
 	jest,
 	test
 } from '@jest/globals';
-
-import { GLOBAL_SELECTOR } from '../../..';
 
 import Accessor from '../';
 import * as PathRepositoryModule from '../../accessor-cache/repository/paths';

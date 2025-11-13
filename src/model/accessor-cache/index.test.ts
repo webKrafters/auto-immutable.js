@@ -25,7 +25,7 @@ const Accessor = AccessorModule.default;
 // "(\w+)": --- $1:
 // Any<(\w+)> --- expect.any( $1 ) //
 // console.info( onChangeMock.mock.calls[ 0 ] );
-describe( '1xxxxa', () => {
+describe( '1xxxx', () => {
 // describe( 'AccessorCache class', () => {
 
 	describe( 'atomize(...)', () => {
@@ -230,8 +230,7 @@ describe( '1xxxxa', () => {
 			cache = new TestCache({});
 		});
 		afterAll(() => removeClientSpy.mockRestore() );
-		test( '1xxxxc', () => {
-		// test( `removes client from all existing accessors`, () => {
+		test( `removes client from all existing accessors`, () => {
 			const PATHS = [ 'a.v.c', 'a.c.e' ];
 			cache.get( 'REQUEST_1', ...PATHS, 'j.b.e' );
 			cache.get( 'REQUEST_2', ...PATHS );
