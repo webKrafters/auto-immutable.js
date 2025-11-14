@@ -55,7 +55,16 @@ class AtomValueRepository<T extends Value = Value> {
 		propertyPath : Array<string>
 	) : AtomNode<T>; 
 	getAtomAt( propertyPath ) : AtomNode<T> {
-		return this._data.findActiveNodeAt( propertyPath );
+		return this._data.findActiveNodeAt( tokenizeStringByDots( propertyPath ) );
+	}
+
+	getValueAt( propertyPath : string ) : Readonly<T>;
+	getValueAt(
+		/* split property path string */
+		propertyPath : Array<string>
+	) : Readonly<T>; 
+	getValueAt( propertyPath ) : Readonly<T> {
+		return this.getAtomAt( propertyPath ).value;
 	}
 
 	mergeChanges(

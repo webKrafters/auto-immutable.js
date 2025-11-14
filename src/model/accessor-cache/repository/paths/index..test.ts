@@ -84,15 +84,110 @@ describe( '1xxxx', () => {
 			expect( pathRepo.getSourcePathAt( 873 ) ).toBeUndefined();
 		} );
 	} );
-	describe( '1xxxxs', () => {
-	// describe( 'removeSource(...)', () => {
-		test( '', () => {
-
+	describe( 'removeSource(...)', () => {
+		test( 'removes a source path with all of its generated components from the repository', () => {
+			const source = 'q.v[2].c';
+			const sanitized = 'q.v.2.c';
+			const {
+				sanitizedPathId,
+				sourcePathId
+			} = pathRepo.getPathInfoAt( source );
+			expect( pathRepo.getSanitizedPathOf( sourcePathId ) ).toEqual( sanitized );
+			expect( pathRepo.getIdOfSanitizedPath( sanitized ) ).toEqual( sanitizedPathId );
+			expect( pathRepo.getPathTokensAt( sanitizedPathId ) ).toEqual([ 'q', 'v', '2', 'c' ]);
+			expect( pathRepo.getSourcePathAt( sourcePathId ) ).toEqual( source );
+			pathRepo.removeSource( source );
+			expect( pathRepo.getSanitizedPathOf( sourcePathId ) ).toBeUndefined();
+			expect( pathRepo.getIdOfSanitizedPath( sanitized ) ).toBeUndefined();
+			expect( pathRepo.getPathTokensAt( sanitizedPathId ) ).toBeUndefined();
+			expect( pathRepo.getSourcePathAt( sourcePathId ) ).toBeUndefined();
+		} );
+		test( 'removes a source path but retains generated components when still in use by other sources', () => {
+			const source0 = 'q.v[2].c.0';
+			const source1 = 'q.v[2].c[0]';
+			const sanitized = 'q.v.2.c.0';
+			const {
+				sanitizedPathId,
+				sourcePathId
+			} = pathRepo.getPathInfoAt( source0 );
+			expect( pathRepo.getSanitizedPathOf( sourcePathId ) ).toEqual( sanitized );
+			expect( pathRepo.getIdOfSanitizedPath( sanitized ) ).toEqual( sanitizedPathId );
+			expect( pathRepo.getPathTokensAt( sanitizedPathId ) ).toEqual([ 'q', 'v', '2', 'c', '0' ]);
+			expect( pathRepo.getSourcePathAt( sourcePathId ) ).toEqual( source0 );
+			const pInfo1 = pathRepo.getPathInfoAt( source1 );
+			expect( pInfo1.sanitizedPathId ).toBe( sanitizedPathId );
+			expect( pInfo1.sourcePathId ).not.toBe( sourcePathId );
+			expect( pathRepo.getSanitizedPathOf( pInfo1.sourcePathId ) ).toEqual( sanitized );
+			expect( pathRepo.getIdOfSanitizedPath( sanitized ) ).toEqual( sanitizedPathId );
+			expect( pathRepo.getPathTokensAt( pInfo1.sanitizedPathId ) ).toEqual([ 'q', 'v', '2', 'c', '0' ]);
+			expect( pathRepo.getSourcePathAt( pInfo1.sourcePathId ) ).toEqual( source1 );
+			pathRepo.removeSource( source0 );
+			expect( pathRepo.getSanitizedPathOf( sourcePathId ) ).toBeUndefined();
+			expect( pathRepo.getSanitizedPathOf( pInfo1.sourcePathId ) ).toEqual( sanitized );
+			expect( pathRepo.getIdOfSanitizedPath( sanitized ) ).toEqual( sanitizedPathId );
+			expect( pathRepo.getPathTokensAt( sanitizedPathId ) ).toEqual([ 'q', 'v', '2', 'c', '0' ]);
+			expect( pathRepo.getSourcePathAt( sourcePathId ) ).toBeUndefined();
+			expect( pathRepo.getSourcePathAt( pInfo1.sourcePathId ) ).toEqual( source1 );
+			pathRepo.removeSource( source1 );
+			expect( pathRepo.getSanitizedPathOf( sourcePathId ) ).toBeUndefined();
+			expect( pathRepo.getSanitizedPathOf( pInfo1.sourcePathId ) ).toBeUndefined();
+			expect( pathRepo.getIdOfSanitizedPath( sanitized ) ).toBeUndefined();
+			expect( pathRepo.getPathTokensAt( sanitizedPathId ) ).toBeUndefined();
+			expect( pathRepo.getSourcePathAt( sourcePathId ) ).toBeUndefined();
+			expect( pathRepo.getSourcePathAt( pInfo1.sourcePathId ) ).toBeUndefined();
 		} );
 	} );
 	describe( 'removeSourceId(...)', () => {
-		test( '', () => {
-
+		test( 'removes a source path by its `id` with all of its generated components from the repository', () => {
+			const source = 'q.v[2].c';
+			const sanitized = 'q.v.2.c';
+			const {
+				sanitizedPathId,
+				sourcePathId
+			} = pathRepo.getPathInfoAt( source );
+			expect( pathRepo.getSanitizedPathOf( sourcePathId ) ).toEqual( sanitized );
+			expect( pathRepo.getIdOfSanitizedPath( sanitized ) ).toEqual( sanitizedPathId );
+			expect( pathRepo.getPathTokensAt( sanitizedPathId ) ).toEqual([ 'q', 'v', '2', 'c' ]);
+			expect( pathRepo.getSourcePathAt( sourcePathId ) ).toEqual( source );
+			pathRepo.removeSourceId( sourcePathId );
+			expect( pathRepo.getSanitizedPathOf( sourcePathId ) ).toBeUndefined();
+			expect( pathRepo.getIdOfSanitizedPath( sanitized ) ).toBeUndefined();
+			expect( pathRepo.getPathTokensAt( sanitizedPathId ) ).toBeUndefined();
+			expect( pathRepo.getSourcePathAt( sourcePathId ) ).toBeUndefined();
+		} );
+		test( 'removes a source path by its `id` but retains generated components when still in use by other sources', () => {
+			const source0 = 'q.v[2].c.0';
+			const source1 = 'q.v[2].c[0]';
+			const sanitized = 'q.v.2.c.0';
+			const {
+				sanitizedPathId,
+				sourcePathId
+			} = pathRepo.getPathInfoAt( source0 );
+			expect( pathRepo.getSanitizedPathOf( sourcePathId ) ).toEqual( sanitized );
+			expect( pathRepo.getIdOfSanitizedPath( sanitized ) ).toEqual( sanitizedPathId );
+			expect( pathRepo.getPathTokensAt( sanitizedPathId ) ).toEqual([ 'q', 'v', '2', 'c', '0' ]);
+			expect( pathRepo.getSourcePathAt( sourcePathId ) ).toEqual( source0 );
+			const pInfo1 = pathRepo.getPathInfoAt( source1 );
+			expect( pInfo1.sanitizedPathId ).toBe( sanitizedPathId );
+			expect( pInfo1.sourcePathId ).not.toBe( sourcePathId );
+			expect( pathRepo.getSanitizedPathOf( pInfo1.sourcePathId ) ).toEqual( sanitized );
+			expect( pathRepo.getIdOfSanitizedPath( sanitized ) ).toEqual( sanitizedPathId );
+			expect( pathRepo.getPathTokensAt( pInfo1.sanitizedPathId ) ).toEqual([ 'q', 'v', '2', 'c', '0' ]);
+			expect( pathRepo.getSourcePathAt( pInfo1.sourcePathId ) ).toEqual( source1 );
+			pathRepo.removeSourceId( sourcePathId );
+			expect( pathRepo.getSanitizedPathOf( sourcePathId ) ).toBeUndefined();
+			expect( pathRepo.getSanitizedPathOf( pInfo1.sourcePathId ) ).toEqual( sanitized );
+			expect( pathRepo.getIdOfSanitizedPath( sanitized ) ).toEqual( sanitizedPathId );
+			expect( pathRepo.getPathTokensAt( sanitizedPathId ) ).toEqual([ 'q', 'v', '2', 'c', '0' ]);
+			expect( pathRepo.getSourcePathAt( sourcePathId ) ).toBeUndefined();
+			expect( pathRepo.getSourcePathAt( pInfo1.sourcePathId ) ).toEqual( source1 );
+			pathRepo.removeSourceId( pInfo1.sourcePathId );
+			expect( pathRepo.getSanitizedPathOf( sourcePathId ) ).toBeUndefined();
+			expect( pathRepo.getSanitizedPathOf( pInfo1.sourcePathId ) ).toBeUndefined();
+			expect( pathRepo.getIdOfSanitizedPath( sanitized ) ).toBeUndefined();
+			expect( pathRepo.getPathTokensAt( sanitizedPathId ) ).toBeUndefined();
+			expect( pathRepo.getSourcePathAt( sourcePathId ) ).toBeUndefined();
+			expect( pathRepo.getSourcePathAt( pInfo1.sourcePathId ) ).toBeUndefined();
 		} );
 	} );
 } );
