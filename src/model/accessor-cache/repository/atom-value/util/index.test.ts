@@ -6,7 +6,7 @@ import {
 
 import '../../../../../test-artifacts/suppress-render-compat';
 
-import { isAPrefixOfB } from './util';
+import { isAPrefixOfB } from '../util';
 
 /* @debug */
 // "(\w+)": --- $1:

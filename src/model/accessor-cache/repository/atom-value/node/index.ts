@@ -20,7 +20,7 @@ import Atom from '../../../../atom';
 
 class AtomNode<T extends Value>{
 
-	static createRoot<T extends Value>() { return new AtomNode<T>( null, null ) }
+	static createRoot<T extends Value>() { return new AtomNode<T>( GLOBAL_SELECTOR, null ) }
 
 	private _atom : Atom;
 	private _branches : Record<KeyType, AtomNode<T>> = {};
@@ -55,7 +55,10 @@ class AtomNode<T extends Value>{
 	}
 
 	get branches() { return this._branches }
-	get fullPath() { return this._fullPathRepo.getPathTokensAt( this._fullPathId ) }
+	get fullPath() {
+		if( this._key === GLOBAL_SELECTOR ) { return [ this._key ] }
+		return this._fullPathRepo.getPathTokensAt( this._fullPathId );
+	}
 	get isActive() { return !!this._atom }
 	get isLeaf() { return !Object.keys( this._branches ).length }
 	get isRoot() { return !this._head }
@@ -112,26 +115,30 @@ class AtomNode<T extends Value>{
 		let node = this._findRoot();
 		if( fullPath[ 0 ] === GLOBAL_SELECTOR ) {
 			return node._activateNodeWith({
-				dottedPathId: pathRepo.getPathInfoAt( GLOBAL_SELECTOR ).sanitizedPathId,
+				dottedPathId: pathRepo.getIdOfSanitizedPath( GLOBAL_SELECTOR ),
 				pathRepo
 			}, origin );
 		}
 		let key : KeyType;
 		for( let tLen = fullPath.length - 1, t = 0; t < tLen; t++ ) {
 			key = fullPath[ t ];
-			if( key in node.branches ) {
-				node = node.branches[ key ];
+			if( key in node._branches ) {
+				node = node._branches[ key ];
 				if( !node.isActive ) { continue }
 				return node._addAtomNodeAt( fullPath, origin );
 			}
-			node.branches[ key ] = new AtomNode<T>( key, node );
-			node = node.branches[ key ];
+			node._branches[ key ] = new AtomNode<T>( key, node );
+			node = node._branches[ key ];
 		}
 		key = fullPath.at( -1 );
-		node.branches[ key ] = new AtomNode<T>( key, node, {
-			dottedPathId: pathRepo.getPathInfoAt( fullPath.join( '.' ) ).sanitizedPathId,
+		const pathSource = {
+			dottedPathId: pathRepo.getIdOfSanitizedPath( fullPath.join( '.' ) ),
 			pathRepo
-		}, undefined, origin );
+		};
+		if( key in node._branches ) {
+			return node._branches[ key ]._activateNodeWith( pathSource, origin );
+		}
+		node._branches[ key ] = new AtomNode<T>( key, node, pathSource, undefined, origin );
 	}
 
 	/**
@@ -218,7 +225,7 @@ class AtomNode<T extends Value>{
 	 * @param {Array<string>} fullPath - must be a prefix of and shorter than `this.fullPath`
 	 */
 	@activeNodesOnly
-	private _addAncestorAtomNodeAt( fullPath : Array<string>, origin : T ) {
+	private _addAncestorAtomNodeAt( fullPath : Array<string>, origin : T ) : void {
 		if( !this.isRootAtom ) {
 			return this.rootAtomNode._addAncestorAtomNodeAt( fullPath, origin );
 		}
@@ -228,14 +235,14 @@ class AtomNode<T extends Value>{
 		const key = fullPath.at( -1 );
 		if( !isNewRootAtom ) {
 			node._head._branches[ key ] = new AtomNode<T>( key, node._head, {
-				dottedPathId: this._fullPathRepo.getPathInfoAt( fullPath.join( '.' ) ).sanitizedPathId,
+				dottedPathId: this._fullPathRepo.getIdOfSanitizedPath( fullPath.join( '.' ) ),
 				pathRepo: this._fullPathRepo
 			}, this.rootAtomNode );
 			node._head._branches[ key ]._branches = node._branches;
 			return;
 		}
 		node._head._branches[ key ] = new AtomNode<T>( key, node._head, {
-			dottedPathId: this._fullPathRepo.getPathInfoAt( fullPath.join( '.' ) ).sanitizedPathId,
+			dottedPathId: this._fullPathRepo.getIdOfSanitizedPath( fullPath.join( '.' ) ),
 			pathRepo: this._fullPathRepo
 		}, undefined, origin );
 		node._head._branches[ key ]._branches = node._branches;
@@ -270,14 +277,14 @@ class AtomNode<T extends Value>{
 		const key = fullPath.at( -1 );
 		if( !( key in node._branches ) ) {
 			node._branches[ key ] = new AtomNode<T>( key, node, { 
-				dottedPathId: this._fullPathRepo.getPathInfoAt( fullPath.join( '.' ) ).sanitizedPathId,
+				dottedPathId: this._fullPathRepo.getIdOfSanitizedPath( fullPath.join( '.' ) ),
 				pathRepo: this._fullPathRepo
 			}, this._rootAtomNode );
 			return;
 		}
 		!node._branches[ key ].isActive &&
 		node._branches[ key ]._activateNodeWith({ 
-			dottedPathId: this._fullPathRepo.getPathInfoAt( fullPath.join( '.' ) ).sanitizedPathId,
+			dottedPathId: this._fullPathRepo.getIdOfSanitizedPath( fullPath.join( '.' ) ),
 			pathRepo: this._fullPathRepo
 		}, undefined, this._rootAtomNode );
 	}
@@ -291,7 +298,7 @@ class AtomNode<T extends Value>{
 	 * @param {AtomNode<T>} [rootAtomNode] - leave empty if creating active descendant atom node.
 	 * @template T
 	 */
-	_activateNodeWith(
+	private _activateNodeWith(
 		{ dottedPathId, pathRepo } : FullPathSource,
 		origin : T,
 		rootAtomNode : AtomNode<T> = null
@@ -356,7 +363,7 @@ class AtomNode<T extends Value>{
 	}
 
 	/** handling removal of node. - discarding all dangling leaf nodes leading up to it. */
-	_destroy() {
+	private _destroy() {
 		if( this.isRoot ) { return }
 		let head = this._head;
 		delete head._branches[ this._key ];
@@ -408,14 +415,14 @@ class AtomNode<T extends Value>{
 		for( let fLen = fullPath.length, f = 0; f < fLen; f++ ) {
 			const key = fullPath[ f ];
 			if( !( key in node._branches ) ) { return null }
-			node = node.branches[ key ];
+			node = node._branches[ key ];
 		}
 		return node;
 	}
 
 	private _findRoot() {
 		let head = this as AtomNode<T>;
-		if( !head.isRoot ) { head = head._head }
+		while( !head.isRoot ) { head = head._head }
 		return head;
 	}
 

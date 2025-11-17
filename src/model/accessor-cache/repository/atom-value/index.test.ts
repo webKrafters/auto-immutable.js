@@ -104,8 +104,7 @@ describe( '1xxxx', () => {
 				expect( valueGetterSpy ).toHaveBeenCalledTimes( 1 );
 			} );
 		} );
-		describe( '1xxxxa', () => {
-		// describe( 'mergeChanges(...)', () => {
+		describe( 'mergeChanges(...)', () => {
 			test( 'merges slices matching paths into atom values', () => {
 				const setValueAtSpy = jest
 					.spyOn( AtomNode.prototype, 'setValueAt' )
@@ -118,14 +117,17 @@ describe( '1xxxx', () => {
 					[ 'registered', 'time', 'minutes' ]
 				];
 				new AtomValue( source, pathRepo ).mergeChanges(
-					source, paths as Readonly<Array<Arsray<string>>>
+					source, paths as Readonly<Array<Array<string>>>
 				);
 				expect( setValueAtSpy ).toHaveBeenCalledTimes( paths.length );
-				for( let p = 0; p < paths.length; p++ ) {
-					expect( setValueAtSpy.mock.calls[ p ] ).toEqual([
-						paths[ p ],
-						get( source, paths[ p ] )._value
-					]);
+				const eMap = paths.reduce(( r, p ) => {
+					r[ p.join( '.' ) ] = get( source, p )._value;
+					return r;
+			 	}, {} as Record<string, unknown>);
+				for( const [ path, value ] of setValueAtSpy.mock.calls ) {
+					const dotPath = path.join( '.' );
+					expect( dotPath in eMap ).toBe( true );
+					expect( value ).toEqual( eMap[ dotPath ] );
 				}
 				setValueAtSpy.mockRestore();
 			} );
