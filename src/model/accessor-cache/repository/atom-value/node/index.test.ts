@@ -138,8 +138,7 @@ describe( '1xxxx', () => {
 				expect( rootAtom ).toBe( a.activeRoot );
 			} );
 		} );
-		describe( '1xxxxa', () => {
-		// describe( 'insertAtomAt(...)', () => {
+		describe( 'insertAtomAt(...)', () => {
 			const a = getArtifact();
 			test( 'inserts at the leaf node', () => {
 				expect( a.activeNode.isLeaf ).toBe( true );
@@ -151,26 +150,39 @@ describe( '1xxxx', () => {
 					expect( node.isActive ).toBe( index === ( length - 1 ) );
 				} );
 			} );
+			test( 'bifurcate an atom node path', () => {
+				// bifurcating active path tokens:
+				// a > b > c > d > e > f
+				// at node #4, creating:
+				//			   d > e > f
+				// a > b > c > |
+				//			   i > j > k
+				const nodePathTokens = [ ...a.activePathTokens.slice( 0, 3 ), 'i', 'j', 'k' ];
+				a.activePathRepo.getPathInfoAt( nodePathTokens.join( '.' ) );
+				expect( a.activeNode.findActiveNodeAt( nodePathTokens ) ).toBeNull();
+				a.activeNode.insertAtomAt( nodePathTokens, a.activePathRepo, {} );
+				expect( a.activeNode.findActiveNodeAt( nodePathTokens ) ).toBeInstanceOf( AtomNode );
+			} );
 			describe( 'inserting atoms into connective nodes', () => {
 				let _a = getArtifact();
 				test( 'converts an inactive parent node into an active one', () => {
-					const parentPath = _a.activePathTokens.slice( 0, -1 );
+					const parentPathTokens = _a.activePathTokens.slice( 0, -1 );
 					expect( _a.activeNode.isActive ).toBe( true );
-					let parentNode = _a.activeNode.findActiveNodeAt( parentPath );
+					let parentNode = _a.activeNode.findActiveNodeAt( parentPathTokens );
 					expect( parentNode ).toBeNull();
-					_a.activePathRepo.getPathInfoAt( parentPath.join( '.' ) );
-					_a.activeNode.insertAtomAt( parentPath, _a.activePathRepo, {} );
-					parentNode = _a.activeNode.findActiveNodeAt( parentPath )!;
+					_a.activePathRepo.getPathInfoAt( parentPathTokens.join( '.' ) );
+					_a.activeNode.insertAtomAt( parentPathTokens, _a.activePathRepo, {} );
+					parentNode = _a.activeNode.findActiveNodeAt( parentPathTokens )!;
 					expect( parentNode.isActive ).toBe( true );
 					expect( parentNode.branches[ _a.activeNode.key ] ).toBe( _a.activeNode );
 				} );
 				test( 'converts any inactive node into an active node', () => {
 					const nodePathLen = 2;
-					const nodePath = _a.activePathTokens.slice( 0, nodePathLen );
+					const nodePathTokens = _a.activePathTokens.slice( 0, nodePathLen );
 					// confirm that node at this path is an isolated connective ancestor node.
 					{
 						let node = _a.activeRoot;
-						nodePath.forEach( key => {
+						nodePathTokens.forEach( key => {
 							node = node.branches[ key ];
 							expect( node.isActive ).toBe( false );
 						} );
@@ -180,12 +192,12 @@ describe( '1xxxx', () => {
 						expect( node.isActive ).toBe( false );
 					}
 					// add the atom to the 3rd connective node
-					_a.activePathRepo.getPathInfoAt( nodePath.join( '.' ) );
-					_a.activeRoot.insertAtomAt( nodePath, _a.activePathRepo, {} );
+					_a.activePathRepo.getPathInfoAt( nodePathTokens.join( '.' ) );
+					_a.activeRoot.insertAtomAt( nodePathTokens, _a.activePathRepo, {} );
 					// confirm that node at this path is now an isolated but active ancestor node.
 					{
 						let node = _a.activeRoot;
-						nodePath.forEach(( key, index, { length } ) => {
+						nodePathTokens.forEach(( key, index, { length } ) => {
 							node = node.branches[ key ];
 							expect( node.isActive ).toBe( index === ( length - 1 ) );
 						} );
@@ -207,9 +219,105 @@ describe( '1xxxx', () => {
 				} );
 			} );
 		} );
-		describe( 'remove(...)', () => {
-			test( '', () => {
-
+		describe( '1xxxxa', () => {
+		// describe( 'remove(...)', () => {
+			const a = getArtifact();
+			test( 'can only be used on an active node', () => {
+				expect( a.activeRoot.isActive ).toBe( false );
+				expect(() => { a.activeRoot.remove() }).toThrow(
+					'applicable only to nodes containing atoms: assert via a `this.isActive` check.'
+				);
+			} );
+			test( 'removes this node along with all connective nodes laading up to it', () => {
+				const newPathTokens = [ 'c', 'm', 'k', 'b', 'n', 'm', 'k', 'j' ];
+				expect( Object.keys( a.activeRoot.branches ) ).toHaveLength( 1 );
+				expect( newPathTokens[ 0 ] in a.activeRoot.branches ).toBe( false );
+				expect( a.activeRoot.findActiveNodeAt( newPathTokens ) ).toBeNull();
+				a.activePathRepo.getPathInfoAt( newPathTokens.join( '.' ) );
+				a.activeRoot.insertAtomAt( newPathTokens, a.activePathRepo, {} );
+				expect( Object.keys( a.activeRoot.branches ) ).toHaveLength( 2 );
+				expect( newPathTokens[ 0 ] in a.activeRoot.branches ).toBe( true );
+				const newNode = a.activeRoot.findActiveNodeAt( newPathTokens )!;
+				expect( newNode.isActive ).toBe( true );
+				expect( newNode.isLeaf ).toBe( true );
+				// confirm all inactive leading nodes
+				{
+					let count = -1;
+					let node = a.activeRoot.branches[ newPathTokens[ ++count ] ];
+					do {
+						expect( node.isActive ).toBe( false );
+						node = node.branches[ newPathTokens[ ++count ] ];
+					} while( node !== newNode )
+				}
+				newNode.remove();
+				expect( Object.keys( a.activeRoot.branches ) ).toHaveLength( 1 );
+				expect( newPathTokens[ 0 ] in a.activeRoot.branches ).toBe( false );
+				expect( a.activeRoot.findActiveNodeAt( newPathTokens ) ).toBeNull();
+			} );
+			test( 'does not remove any shared connective nodes laading up to removed node', () => {
+				const sharedLen = 4;
+				const newPathTokens = [ ...a.activePathTokens.slice( 0, sharedLen ), 'c', 'm', 'k' ];
+				let splittingNode = a.activeRoot;
+				for( let p = 0; p < sharedLen; p++ ) {
+					splittingNode = splittingNode.branches[ newPathTokens[ p ] ];
+ 				}
+				expect( splittingNode.isActive ).toBe( false );
+				expect( Object.keys( splittingNode.branches ) ).toHaveLength( 1 );
+				expect( splittingNode.findActiveNodeAt( a.activePathTokens ) ).toBe( a.activeNode );
+				expect( splittingNode.findActiveNodeAt( newPathTokens ) ).toBeNull();
+				a.activePathRepo.getPathInfoAt( newPathTokens.join( '.' ) );
+				splittingNode.insertAtomAt( newPathTokens, a.activePathRepo, {} );
+				expect( splittingNode.isActive ).toBe( false );
+				expect( Object.keys( splittingNode.branches ) ).toHaveLength( 2 );
+				expect( splittingNode.findActiveNodeAt( a.activePathTokens ) ).toBe( a.activeNode );
+				const newNode = splittingNode.findActiveNodeAt( newPathTokens )!;
+				expect( newNode ).toBeInstanceOf( AtomNode );
+				newNode.remove();
+				expect( Object.keys( splittingNode.branches ) ).toHaveLength( 1 );
+				expect( splittingNode.isActive ).toBe( false );
+				expect( splittingNode.findActiveNodeAt( a.activePathTokens ) ).toBe( a.activeNode );
+				expect( splittingNode.findActiveNodeAt( newPathTokens ) ).toBeNull();
+			} );
+			test( 'does not remove any active ancestor node found in removed node path', () => {
+				const ancestorPathTokkns = [ 'c', 'm', 'k', 'b' ];
+				const leafPathTokens = [ ...ancestorPathTokkns, 'n', 'm', 'k', 'j' ];
+				expect( a.activeNode.findActiveNodeAt( leafPathTokens ) ).toBeNull();
+				a.activePathRepo.getPathInfoAt( leafPathTokens.join( '.' ) );
+				a.activeNode.insertAtomAt( leafPathTokens, a.activePathRepo, {} );
+				const leafNode = a.activeNode.findActiveNodeAt( leafPathTokens )!;
+				expect( leafNode ).toBeInstanceOf( AtomNode );
+				expect( a.activeNode.findActiveNodeAt( ancestorPathTokkns ) ).toBeNull();
+				a.activePathRepo.getPathInfoAt( ancestorPathTokkns.join( '.' ) );
+				a.activeNode.insertAtomAt( ancestorPathTokkns, a.activePathRepo, {} );
+				const ancestorNode = a.activeNode.findActiveNodeAt( ancestorPathTokkns )!;
+				expect( ancestorNode ).toBeInstanceOf( AtomNode );
+				//confirms that precedent node is an active ancestor node of removed node
+				expect( ancestorNode.isLeaf ).toBe( false );
+				expect( a.activeNode.findActiveNodeAt( leafPathTokens ) ).toBe( leafNode );
+				leafNode.remove();
+				expect( a.activeNode.findActiveNodeAt( leafPathTokens ) ).toBeNull();
+				expect( ancestorNode.isLeaf ).toBe( true );
+			} );
+			test( 'removing an active ancestor converts it to an inactive connective node', () => {
+				const ancestorPathTokkns = [ 'c', 'm', 'k', 'b' ];
+				const leafPathTokens = [ ...ancestorPathTokkns, 'n', 'm', 'k', 'j' ];
+				a.activePathRepo.getPathInfoAt( ancestorPathTokkns.join( '.' ) );
+				a.activeNode.insertAtomAt( ancestorPathTokkns, a.activePathRepo, {} );
+				const ancestorNode = a.activeNode.findActiveNodeAt( ancestorPathTokkns )!;
+				a.activePathRepo.getPathInfoAt( leafPathTokens.join( '.' ) );
+				a.activeNode.insertAtomAt( leafPathTokens, a.activePathRepo, {} );
+				let removedNode = a.activeRoot;
+				for( let key of ancestorPathTokkns ) {
+					removedNode = removedNode.branches[ key ];
+				}
+				expect( removedNode ).toBe( ancestorNode );
+				expect( removedNode.isActive ).toBe( true );
+				removedNode.remove();
+				removedNode = a.activeRoot;
+				for( let key of ancestorPathTokkns ) {
+					removedNode = removedNode.branches[ key ];
+				}
+				expect( removedNode.isActive ).toBe( false );
 			} );
 		} );
 		describe( 'removeAccessor(...)', () => {
