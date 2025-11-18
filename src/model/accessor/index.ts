@@ -87,9 +87,11 @@ class Accessor <T extends Value> {
 		const valueRepo = this._valueRepo;
 		for( const pathId of this._sourcePathIds ) {
 			if( !( pathId in atoms ) ) {
-				const pathTokens = this._getTokenizedPath( pathId );
-				valueRepo.addDataForAtomAt( pathTokens );
-				atoms[ pathId ] = valueRepo.getAtomAt( pathTokens );
+				const sanitizedPathId = this._pathRepo.getIdOfSanitizedPath(
+					this._pathRepo.getSanitizedPathOf( pathId )
+				);
+				valueRepo.addDataForAtomAt( sanitizedPathId );
+				atoms[ pathId ] = valueRepo.getAtomAt( sanitizedPathId );
 			}
 			atoms[ pathId ].addAccessor( this._id );
 		}

@@ -6,20 +6,6 @@ import PathRepository from '../paths';
 
 import AtomNode from './node';
 
-const tokenizeStringByDots = (() => {
-	const pathSplitPtn = /\./g;
-	function t( str : string ) : Array<string>;
-	function t(
-		/* already tokenized string */
-		str : Array<string>
-	) : Array<string>; 
-	function t( str ) : Array<string> {
-		if( Array.isArray( str ) ) { return str }
-		return str.split( pathSplitPtn );
-	}
-	return t;
-})();
-
 class AtomValueRepository<T extends Value = Value> {
 	private _data : AtomNode<T>;
 	private _origin : T;
@@ -36,35 +22,22 @@ class AtomValueRepository<T extends Value = Value> {
 		this._pathRepo = pathRepo;
 	}
 
-	addDataForAtomAt( propertyPath : string ) : void;
-	addDataForAtomAt(
-		/* split property path string */
-		propertyPath : Array<string>
-	) : void; 
-	addDataForAtomAt( propertyPath ) : void {
+	addDataForAtomAt( sanitizedPathId : number ) : void {
 		this._data.insertAtomAt(
-			tokenizeStringByDots( propertyPath ),
+			sanitizedPathId,
 			this._pathRepo,
 			this._origin
 		);
 	}
 
-	getAtomAt( propertyPath : string ) : AtomNode<T>;
-	getAtomAt(
-		/* split property path string */
-		propertyPath : Array<string>
-	) : AtomNode<T>; 
-	getAtomAt( propertyPath ) : AtomNode<T> {
-		return this._data.findActiveNodeAt( tokenizeStringByDots( propertyPath ) );
+	getAtomAt( sanitizedPathId : number ) : AtomNode<T> {
+		return this._data.findActiveNodeAt(
+			this._pathRepo.getPathTokensAt( sanitizedPathId )
+		);
 	}
 
-	getValueAt( propertyPath : string ) : Readonly<T>;
-	getValueAt(
-		/* split property path string */
-		propertyPath : Array<string>
-	) : Readonly<T>; 
-	getValueAt( propertyPath ) : Readonly<T> {
-		return this.getAtomAt( propertyPath ).value;
+	getValueAt( sanitizedPathId : number ) : Readonly<T> {
+		return this.getAtomAt( sanitizedPathId ).value;
 	}
 
 	mergeChanges(

@@ -5,14 +5,12 @@ import {
 	test
 } from '@jest/globals';
 
-import createSourceData from '../../../../../test-artifacts/data/create-data-obj';
-
 import PathRepository from '../../paths';
 import Atom from '../../../../atom';
 import AtomNode from '.';
 import { GLOBAL_SELECTOR } from '../../../../../constants';
 
-type SourceData = ReturnType<typeof createSourceData>;
+type Data = ReturnType<typeof getChangeData>;
 
 /* @debug */
 // "(\w+)": --- $1:
@@ -20,20 +18,16 @@ type SourceData = ReturnType<typeof createSourceData>;
 // console.info( onChangeMock.mock.calls[ 0 ] );
 describe( '1xxxx', () => {
 // describe( 'AtomNode class', () => {
-	let sourceData : SourceData;
-	let rootNode : AtomNode<SourceData>;
-	let pathRepo : PathRepository;
-	beforeAll(() => {
-		sourceData = createSourceData();
-		pathRepo = new PathRepository();
-		rootNode = AtomNode.createRoot();
-	});
-	test( 'creates an atom node', () => expect( rootNode ).toBeInstanceOf( AtomNode ) );
-	test( 'root node has a default global path  and key', () => {
-		const globalPathTokens = [ GLOBAL_SELECTOR ];
-		expect( rootNode.key ).toBe( globalPathTokens[ 0 ] );
-		expect( rootNode.fullPath ).toEqual( globalPathTokens );
- 	} );
+	describe( 'root node', () => {
+		let rootNode : AtomNode<Data>;
+		beforeAll(() => { rootNode = AtomNode.createRoot() });
+		test( 'creates an atom node', () => expect( rootNode ).toBeInstanceOf( AtomNode ) );
+		test( 'root node has a default global path  and key', () => {
+			const globalPathTokens = [ GLOBAL_SELECTOR ];
+			expect( rootNode.key ).toBe( globalPathTokens[ 0 ] );
+			expect( rootNode.fullPath ).toEqual( globalPathTokens );
+		} );
+	} );
 	describe( 'properties', () => {
 		describe( 'branches', () => {
 			test( '', () => {
@@ -75,9 +69,65 @@ describe( '1xxxx', () => {
 
 			} );
 		} );
-		describe( 'value', () => {
-			test( '', () => {
-
+		describe( '1xxxxa', () => {
+		// describe( 'value', () => {
+			let pathRepo : PathRepository;
+			let root : AtomNode<{}>;
+			beforeEach(() => {
+				const info = createTestAtomArtifact( {} as Data );
+				pathRepo = info.pathRepo;
+				root = info.root;
+			});
+			test( 'can only be used on an active node', () => {
+				expect( root.isActive ).toBe( false );
+				expect(() => { root.value = {} }).toThrow(
+					'applicable only to nodes containing atoms: assert via a `this.isActive` check.'
+				);
+				const { sanitizedPathId } = pathRepo.getPathInfoAt( GLOBAL_SELECTOR );
+				root.insertAtomAt( sanitizedPathId, pathRepo, {} );
+				expect( root.isActive ).toBe( true );
+				expect(() => { root.value = {} }).not.toThrow();
+			} );
+			describe( 'functionality', () => {
+				test( 'sets the value', () => {
+					const { root } = createTestAtomArtifact({} as Data);
+					const node = root.findActiveNodeAt([ 'q', 'r', 's', 't' ])!;
+					const value = getChangeData().q.r.s.t;
+					expect( node.value ).toBeUndefined();
+					node.value = value as Data;
+					expect( node.value ).toEqual( value );
+				} );
+				test( 'ensures that set value is readonly', () => {
+					const { root } = createTestAtomArtifact({} as Data);
+					const node = root.findActiveNodeAt([ 'q', 'r', 's', 't' ])!;
+					const value = {
+						c: { j: 'testing' },
+						e: 33,
+						i: [ 2, 5, 4, 2 ]
+					} as unknown as typeof node.value;
+					node.value = value;
+					expect( Object.isFrozen( node.value ) ).toBe( true );
+					// @ts-ignore
+					expect( Object.isFrozen( node.value.e ) ).toBe( true );
+					// @ts-ignore
+					expect( Object.isFrozen( node.value.i[ 3 ] ) ).toBe( true );
+					// @ts-ignore
+					expect( Object.isFrozen( node.value.c.j ) ).toBe( true );
+				} );
+				test( 'ensures that all atom values of atoms up the are readonly', () => {
+					const { root } = createTestAtomArtifact({} as Data);
+					const node = root.findActiveNodeAt([ 'a', 'b', 'c', 'd', 'e' ])!;
+					const value = { message: 'this is the test....' } as unknown as typeof node.value;
+					node.value = value;
+					expect( Object.isFrozen( node.value ) ).toBe( true );
+					( function isReadonly( v : Record<string,{}> ) {
+						expect( Object.isFrozen( v ) ).toBe( true );
+						if( Object.prototype.toString.call( v ) === '[object String]'
+							|| !Object.keys( v ).length
+						) { return }
+						for( let k in v ) { isReadonly( v[ k ] ) }
+					} )( node.rootAtomNode.value );
+				} );
 			} );
 		} );
 	} );
@@ -86,14 +136,16 @@ describe( '1xxxx', () => {
 			const a = {
 				activeNode: null as unknown as AtomNode<{}>,
 				activePathTokens: [ 'a', 'b', 'c', 'd', 'e', 'f' ],
+				activePathTokensId : undefined as unknown as number,
 				activePathRepo: null as unknown as PathRepository,
 				activeRoot: null as unknown as AtomNode<{}>
 			};
 			beforeAll(() => {
 				a.activeRoot = AtomNode.createRoot();
 				a.activePathRepo = new PathRepository();
-				a.activePathRepo.getPathInfoAt( a.activePathTokens.join( '.' ) );
-				a.activeRoot.insertAtomAt( a.activePathTokens, a.activePathRepo, {} );
+				const { sanitizedPathId } = a.activePathRepo.getPathInfoAt( a.activePathTokens.join( '.' ) );
+				a.activePathTokensId = sanitizedPathId;
+				a.activeRoot.insertAtomAt( a.activePathTokensId, a.activePathRepo, {} );
 				a.activeNode = a.activeRoot.findActiveNodeAt( a.activePathTokens )!;
 			});
 			return a;
@@ -101,6 +153,7 @@ describe( '1xxxx', () => {
 		describe( 'addAccessor(...)', () => {
 			const a = getArtifact();
 			test( 'can only be used on an active node', () => {
+				const rootNode = AtomNode.createRoot();
 				expect( rootNode.isActive ).toBe( false );
 				expect(() => { rootNode.addAccessor( 1 ) }).toThrow(
 					'applicable only to nodes containing atoms: assert via a `this.isActive` check.'
@@ -121,7 +174,7 @@ describe( '1xxxx', () => {
 		describe( 'findActiveNodeAt(...)', () => {
 			const a = getArtifact();
 			test( 'returns null if path not found in the tree', () => {
-				expect( rootNode.findActiveNodeAt( a.activePathTokens ) ).toBeNull();
+				expect( AtomNode.createRoot().findActiveNodeAt( a.activePathTokens ) ).toBeNull();
 			} );
 			test( 'returns null if path in the tree but has no atom', () => {
 				expect( a.activeNode.findActiveNodeAt( a.activePathTokens.slice( 0, -1 ) ) ).toBeNull();
@@ -131,7 +184,8 @@ describe( '1xxxx', () => {
 			} );
 			test( 'returns rootNode if path in the tree but has an atom', () => {
 				expect( a.activeRoot.isActive ).toBe( false );
-				a.activeNode.insertAtomAt([ GLOBAL_SELECTOR ], a.activePathRepo, {});
+				const { sanitizedPathId: globalPathId } = a.activePathRepo.getPathInfoAt( GLOBAL_SELECTOR );
+				a.activeNode.insertAtomAt( globalPathId, a.activePathRepo, {});
 				expect( a.activeRoot.isActive ).toBe( true );
 				const rootAtom = a.activeRoot.findActiveNodeAt([ GLOBAL_SELECTOR ]);
 				expect( rootAtom ).toBeInstanceOf( AtomNode );
@@ -158,9 +212,9 @@ describe( '1xxxx', () => {
 				// a > b > c > |
 				//			   i > j > k
 				const nodePathTokens = [ ...a.activePathTokens.slice( 0, 3 ), 'i', 'j', 'k' ];
-				a.activePathRepo.getPathInfoAt( nodePathTokens.join( '.' ) );
+				const { sanitizedPathId: nodePathTokensId } = a.activePathRepo.getPathInfoAt( nodePathTokens.join( '.' ) );
 				expect( a.activeNode.findActiveNodeAt( nodePathTokens ) ).toBeNull();
-				a.activeNode.insertAtomAt( nodePathTokens, a.activePathRepo, {} );
+				a.activeNode.insertAtomAt( nodePathTokensId, a.activePathRepo, {} );
 				expect( a.activeNode.findActiveNodeAt( nodePathTokens ) ).toBeInstanceOf( AtomNode );
 			} );
 			describe( 'inserting atoms into connective nodes', () => {
@@ -170,8 +224,10 @@ describe( '1xxxx', () => {
 					expect( _a.activeNode.isActive ).toBe( true );
 					let parentNode = _a.activeNode.findActiveNodeAt( parentPathTokens );
 					expect( parentNode ).toBeNull();
-					_a.activePathRepo.getPathInfoAt( parentPathTokens.join( '.' ) );
-					_a.activeNode.insertAtomAt( parentPathTokens, _a.activePathRepo, {} );
+					const {
+						sanitizedPathId: parentPathTokensId
+					} = _a.activePathRepo.getPathInfoAt( parentPathTokens.join( '.' ) );
+					_a.activeNode.insertAtomAt( parentPathTokensId, _a.activePathRepo, {} );
 					parentNode = _a.activeNode.findActiveNodeAt( parentPathTokens )!;
 					expect( parentNode.isActive ).toBe( true );
 					expect( parentNode.branches[ _a.activeNode.key ] ).toBe( _a.activeNode );
@@ -192,8 +248,10 @@ describe( '1xxxx', () => {
 						expect( node.isActive ).toBe( false );
 					}
 					// add the atom to the 3rd connective node
-					_a.activePathRepo.getPathInfoAt( nodePathTokens.join( '.' ) );
-					_a.activeRoot.insertAtomAt( nodePathTokens, _a.activePathRepo, {} );
+					const {
+						sanitizedPathId: nodePathTokensId
+					} = _a.activePathRepo.getPathInfoAt( nodePathTokens.join( '.' ) );
+					_a.activeRoot.insertAtomAt( nodePathTokensId, _a.activePathRepo, {} );
 					// confirm that node at this path is now an isolated but active ancestor node.
 					{
 						let node = _a.activeRoot;
@@ -212,15 +270,16 @@ describe( '1xxxx', () => {
 					expect( _a.activeRoot.key ).toBe( pathTokens[ 0 ] );
 					expect( _a.activeRoot.isActive ).toBe( false );
 					expect( _a.activeRoot.findActiveNodeAt( pathTokens ) ).toBeNull();
-					_a.activePathRepo.getPathInfoAt( pathTokens.join( '.' ) );
-					_a.activeNode.insertAtomAt( pathTokens, _a.activePathRepo, {} );
+					const {
+						sanitizedPathId: pathTokensId
+					} = _a.activePathRepo.getPathInfoAt( pathTokens.join( '.' ) );
+					_a.activeNode.insertAtomAt( pathTokensId, _a.activePathRepo, {} );
 					expect( _a.activeRoot.isActive ).toBe( true );
 					expect( _a.activeRoot.findActiveNodeAt( pathTokens ) ).toBe( _a.activeRoot );
 				} );
 			} );
 		} );
-		describe( '1xxxxa', () => {
-		// describe( 'remove(...)', () => {
+		describe( 'remove(...)', () => {
 			const a = getArtifact();
 			test( 'can only be used on an active node', () => {
 				expect( a.activeRoot.isActive ).toBe( false );
@@ -233,8 +292,10 @@ describe( '1xxxx', () => {
 				expect( Object.keys( a.activeRoot.branches ) ).toHaveLength( 1 );
 				expect( newPathTokens[ 0 ] in a.activeRoot.branches ).toBe( false );
 				expect( a.activeRoot.findActiveNodeAt( newPathTokens ) ).toBeNull();
-				a.activePathRepo.getPathInfoAt( newPathTokens.join( '.' ) );
-				a.activeRoot.insertAtomAt( newPathTokens, a.activePathRepo, {} );
+				const {
+					sanitizedPathId: newPathTokensId
+				} = a.activePathRepo.getPathInfoAt( newPathTokens.join( '.' ) );
+				a.activeRoot.insertAtomAt( newPathTokensId, a.activePathRepo, {} );
 				expect( Object.keys( a.activeRoot.branches ) ).toHaveLength( 2 );
 				expect( newPathTokens[ 0 ] in a.activeRoot.branches ).toBe( true );
 				const newNode = a.activeRoot.findActiveNodeAt( newPathTokens )!;
@@ -265,8 +326,10 @@ describe( '1xxxx', () => {
 				expect( Object.keys( splittingNode.branches ) ).toHaveLength( 1 );
 				expect( splittingNode.findActiveNodeAt( a.activePathTokens ) ).toBe( a.activeNode );
 				expect( splittingNode.findActiveNodeAt( newPathTokens ) ).toBeNull();
-				a.activePathRepo.getPathInfoAt( newPathTokens.join( '.' ) );
-				splittingNode.insertAtomAt( newPathTokens, a.activePathRepo, {} );
+				const {
+					sanitizedPathId: newPathTokensId
+				} = a.activePathRepo.getPathInfoAt( newPathTokens.join( '.' ) );
+				splittingNode.insertAtomAt( newPathTokensId, a.activePathRepo, {} );
 				expect( splittingNode.isActive ).toBe( false );
 				expect( Object.keys( splittingNode.branches ) ).toHaveLength( 2 );
 				expect( splittingNode.findActiveNodeAt( a.activePathTokens ) ).toBe( a.activeNode );
@@ -279,17 +342,21 @@ describe( '1xxxx', () => {
 				expect( splittingNode.findActiveNodeAt( newPathTokens ) ).toBeNull();
 			} );
 			test( 'does not remove any active ancestor node found in removed node path', () => {
-				const ancestorPathTokkns = [ 'c', 'm', 'k', 'b' ];
-				const leafPathTokens = [ ...ancestorPathTokkns, 'n', 'm', 'k', 'j' ];
+				const ancestorPathTokens = [ 'c', 'm', 'k', 'b' ];
+				const leafPathTokens = [ ...ancestorPathTokens, 'n', 'm', 'k', 'j' ];
 				expect( a.activeNode.findActiveNodeAt( leafPathTokens ) ).toBeNull();
-				a.activePathRepo.getPathInfoAt( leafPathTokens.join( '.' ) );
-				a.activeNode.insertAtomAt( leafPathTokens, a.activePathRepo, {} );
+				const {
+					sanitizedPathId: leafPathTokensId
+				} = a.activePathRepo.getPathInfoAt( leafPathTokens.join( '.' ) );
+				a.activeNode.insertAtomAt( leafPathTokensId, a.activePathRepo, {} );
 				const leafNode = a.activeNode.findActiveNodeAt( leafPathTokens )!;
 				expect( leafNode ).toBeInstanceOf( AtomNode );
-				expect( a.activeNode.findActiveNodeAt( ancestorPathTokkns ) ).toBeNull();
-				a.activePathRepo.getPathInfoAt( ancestorPathTokkns.join( '.' ) );
-				a.activeNode.insertAtomAt( ancestorPathTokkns, a.activePathRepo, {} );
-				const ancestorNode = a.activeNode.findActiveNodeAt( ancestorPathTokkns )!;
+				expect( a.activeNode.findActiveNodeAt( ancestorPathTokens ) ).toBeNull();
+				const {
+					sanitizedPathId: ancestorPathTokensId
+				} = a.activePathRepo.getPathInfoAt( ancestorPathTokens.join( '.' ) );
+				a.activeNode.insertAtomAt( ancestorPathTokensId, a.activePathRepo, {} );
+				const ancestorNode = a.activeNode.findActiveNodeAt( ancestorPathTokens )!;
 				expect( ancestorNode ).toBeInstanceOf( AtomNode );
 				//confirms that precedent node is an active ancestor node of removed node
 				expect( ancestorNode.isLeaf ).toBe( false );
@@ -299,22 +366,26 @@ describe( '1xxxx', () => {
 				expect( ancestorNode.isLeaf ).toBe( true );
 			} );
 			test( 'removing an active ancestor converts it to an inactive connective node', () => {
-				const ancestorPathTokkns = [ 'c', 'm', 'k', 'b' ];
-				const leafPathTokens = [ ...ancestorPathTokkns, 'n', 'm', 'k', 'j' ];
-				a.activePathRepo.getPathInfoAt( ancestorPathTokkns.join( '.' ) );
-				a.activeNode.insertAtomAt( ancestorPathTokkns, a.activePathRepo, {} );
-				const ancestorNode = a.activeNode.findActiveNodeAt( ancestorPathTokkns )!;
-				a.activePathRepo.getPathInfoAt( leafPathTokens.join( '.' ) );
-				a.activeNode.insertAtomAt( leafPathTokens, a.activePathRepo, {} );
+				const ancestorPathTokens = [ 'c', 'm', 'k', 'b' ];
+				const leafPathTokens = [ ...ancestorPathTokens, 'n', 'm', 'k', 'j' ];
+				const {
+					sanitizedPathId: ancestorPathTokensId
+				} = a.activePathRepo.getPathInfoAt( ancestorPathTokens.join( '.' ) );
+				a.activeNode.insertAtomAt( ancestorPathTokensId, a.activePathRepo, {} );
+				const ancestorNode = a.activeNode.findActiveNodeAt( ancestorPathTokens )!;
+				const {
+					sanitizedPathId: leafPathTokensId
+				} = a.activePathRepo.getPathInfoAt( leafPathTokens.join( '.' ) );
+				a.activeNode.insertAtomAt( leafPathTokensId, a.activePathRepo, {} );
 				let removedNode = a.activeRoot;
-				for( let key of ancestorPathTokkns ) {
+				for( let key of ancestorPathTokens ) {
 					removedNode = removedNode.branches[ key ];
 				}
 				expect( removedNode ).toBe( ancestorNode );
 				expect( removedNode.isActive ).toBe( true );
 				removedNode.remove();
 				removedNode = a.activeRoot;
-				for( let key of ancestorPathTokkns ) {
+				for( let key of ancestorPathTokens ) {
 					removedNode = removedNode.branches[ key ];
 				}
 				expect( removedNode.isActive ).toBe( false );
@@ -323,6 +394,7 @@ describe( '1xxxx', () => {
 		describe( 'removeAccessor(...)', () => {
 			const a = getArtifact();
 			test( 'can only be used on an active node', () => {
+				const rootNode = AtomNode.createRoot();
 				expect( rootNode.isActive ).toBe( false );
 				expect(() => { rootNode.removeAccessor( 1 ) }).toThrow(
 					'applicable only to nodes containing atoms: assert via a `this.isActive` check.'
@@ -353,10 +425,142 @@ describe( '1xxxx', () => {
 			} );
 		} );
 		describe( 'setValueAt(...)', () => {
-			test( '', () => {
+			let valueSetterSpy : jest.SpyInstance<void, [Readonly<any>], any>;
+			let testChanges : Data;
+			let root : AtomNode<Data>;
+			let pathRepo : PathRepository;
+			beforeAll(() => {
+				valueSetterSpy = jest
+					.spyOn( AtomNode.prototype, 'value', 'set' )
+					.mockImplementation();
 
+			} );
+			beforeEach(() => {
+				valueSetterSpy.mockClear();
+				const artifact = createTestAtomArtifact({} as Data);
+				root = artifact.root;
+				pathRepo = artifact.pathRepo;
+				testChanges = getChangeData();
+			} )
+			afterAll(() => { valueSetterSpy.mockRestore() })
+			test( 'sets atom at global selector wwhen available', () => {
+				expect( root.key ).toBe( GLOBAL_SELECTOR );
+				expect( root.isActive ).toBe( false );
+				root.insertAtomAt(
+					pathRepo.getPathInfoAt( GLOBAL_SELECTOR ).sanitizedPathId,
+					pathRepo,
+					{} as Data
+				);
+				expect( root.isActive ).toBe( true )
+				root.setValueAt([ GLOBAL_SELECTOR ], testChanges );
+				// called 1x for the newly created super sroot atom at GLOBAL_SELECTOR
+				expect( valueSetterSpy ).toHaveBeenCalledTimes( 1 );
+				expect( valueSetterSpy ).toHaveBeenCalledWith( testChanges );
+			} );
+			test( 'diseminates global selector change to individual section root atoms when global selector node has no atom', () => {
+				expect( root.key ).toBe( GLOBAL_SELECTOR );
+				expect( root.isActive ).toBe( false );
+				root.setValueAt([ GLOBAL_SELECTOR ], testChanges );
+				// called 6x for descendant root atoms at paths 'a.b', 'a.e.f.g.h', 'a.f.g.h', 'q.r.s.a', 'q.r.s.t' and 't'
+				expect( valueSetterSpy ).toHaveBeenCalledTimes( 6 );
+				expect( valueSetterSpy.mock.calls[ 0 ][ 0 ] ).toEqual( testChanges.t );
+				expect( valueSetterSpy.mock.calls[ 1 ][ 0 ] ).toEqual( testChanges.q.r.s.t );
+				expect( valueSetterSpy.mock.calls[ 2 ][ 0 ] ).toEqual( testChanges.q.r.s.a );
+				expect( valueSetterSpy.mock.calls[ 3 ][ 0 ] ).toEqual( testChanges.a.f.g.h );
+				expect( valueSetterSpy.mock.calls[ 4 ][ 0 ] ).toEqual( testChanges.a.e.f.g.h );
+				expect( valueSetterSpy.mock.calls[ 5 ][ 0 ] ).toEqual( testChanges.a.b );
+			} );
+			test( 'does not apply changes not occurring in paths matching or existing the atom value object', () => {
+				root.setValueAt( [ 'w', 'x', 'y', 'z' ], testChanges );
+				expect( valueSetterSpy ).not.toHaveBeenCalled();
+			} );
+			test( 'applies changes on paths not matching any atom path to the closest atom bearing ancestor', () => {
+				testChanges.a.b.c.d = {
+					...testChanges.a.b.c.d,
+					w: { x: { y: { z: {} } } }
+				} as typeof testChanges.a.b.c.d;
+				root.setValueAt( [ 'a', 'b', 'c', 'd' ], testChanges );
+				// called 1x on the closest atom bearing ancestor (this for this change is located at path 'a.b.c')
+				expect( valueSetterSpy ).toHaveBeenCalledTimes( 1 );
+				expect( valueSetterSpy ).toHaveBeenCalledWith( testChanges.a.b.c );
+			} );
+			test( 'applies changes directly to atom bearing nodes with matching paths', () => {
+				testChanges.a.b.c.d.e = {
+					...testChanges.a.b.c.d.e,
+					w: { x: { y: { z: {} } } }
+				} as typeof testChanges.a.b.c.d.e;
+				root.setValueAt( [ 'a', 'b', 'c', 'd', 'e' ], testChanges );
+				// called 1x directly on the atom bearing node (this for this change is located at path 'a.b.c.d.e')
+				expect( valueSetterSpy ).toHaveBeenCalledTimes( 1 );
+				expect( valueSetterSpy ).toHaveBeenCalledWith( testChanges.a.b.c.d.e );
+			} );
+			test( 'merges changes occurring in leaf atom node subpaths to that leaf node', () => {
+				testChanges.a.f.g.h = {
+					...testChanges.a.f.g.h,
+					w: { x: { y: { z: {} } } }
+				};
+				root.setValueAt( [ 'a', 'f', 'g', 'h', 'w', 'x', 'y' ], testChanges );
+				// called 1x on the closest leaf atom node (this for this change is located at path 'a.f.g.h')
+				expect( valueSetterSpy ).toHaveBeenCalledTimes( 1 );
+				expect( valueSetterSpy ).toHaveBeenCalledWith( testChanges.a.f.g.h );
+			} );
+			test( 'assigns to root atom nodes changes occurring at paths preceding above them', () => {
+				testChanges.q.r = {
+					...testChanges.q.r,
+					w: { x: { y: { z: {} } } },
+					s: {
+						a: {},
+						t: {},
+						z: {}
+					}
+				} as typeof testChanges.q.r;
+				root.setValueAt( [ 'q', 'r' ], testChanges );
+				// called 2x for root atoms occurring under the 'q.r' path; namely nodes at paths 'q.r.s.a' and 'q.r.s.t'
+				expect( valueSetterSpy ).toHaveBeenCalledTimes( 2 );
+				expect( valueSetterSpy.mock.calls[ 0 ][ 0 ] ).toEqual( testChanges.q.r.s.t );
+				expect( valueSetterSpy.mock.calls[ 1 ][ 0 ] ).toEqual( testChanges.q.r.s.a );
 			} );
 		} );
 	} );
 });
+
+function createTestAtomArtifact( originData : Data ) {
+	const root = AtomNode.createRoot<Data>();
+	const pathRepo = new PathRepository();
+	[
+		pathRepo.getPathInfoAt( 'a.b' ).sanitizedPathId,
+		pathRepo.getPathInfoAt( 'a.b.c' ).sanitizedPathId,
+		pathRepo.getPathInfoAt( 'a.b.c.d.e' ).sanitizedPathId,
+		pathRepo.getPathInfoAt( 'a.e.f.g.h' ).sanitizedPathId,
+		pathRepo.getPathInfoAt( 'a.f.g.h' ).sanitizedPathId,
+		pathRepo.getPathInfoAt( 'q.r.s.a' ).sanitizedPathId,
+		pathRepo.getPathInfoAt( 'q.r.s.t' ).sanitizedPathId,
+		pathRepo.getPathInfoAt( 't' ).sanitizedPathId,
+		pathRepo.getPathInfoAt( 't.u.v.w' ).sanitizedPathId,
+		pathRepo.getPathInfoAt( 't.u.z' ).sanitizedPathId,
+		pathRepo.getPathInfoAt( 't.y' ).sanitizedPathId
+	].forEach( id => root.insertAtomAt( id, pathRepo, originData ) );
+	return { pathRepo, root }
+}
+
+function getChangeData()  {
+	return {
+		a: {
+			b: { c: { d: { e: {} } } },
+			e: { f: { g: { h: {} } } },
+			f: { g: { h: {} } }
+		},
+		q: { r: { s: {
+			a: {},
+			t: {}
+		} } },
+		t: {
+			u: {
+				v: { w: {} },
+				z: {}
+			},
+			y: {}
+		}
+	};
+}
 

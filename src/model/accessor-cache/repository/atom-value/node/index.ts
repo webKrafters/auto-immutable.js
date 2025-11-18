@@ -17,6 +17,7 @@ import { isAPrefixOfB } from '../util';
 import PathsRepo from '../../paths';
 
 import Atom from '../../../../atom';
+import { makeReadonly } from '../../../../../utils';
 
 class AtomNode<T extends Value>{
 
@@ -86,10 +87,20 @@ class AtomNode<T extends Value>{
 	set value( v : Readonly<T> ) {
 		const previousRootAtomValue = shallowCopy( this._rootAtomNode.value ) as T;
 		if( this.isRootAtom ) {
-			this._rootAtomNode.value = v;
+			this._sectionData = Object.freeze( v );
 		} else {
-			makePathWriteable( this._rootAtomNode.value, this._pathToRootAtom, true );
-			set( this._rootAtomNode.value, this._pathToRootAtom, v );
+			let obj;
+			this._rootAtomNode._sectionData = ( function _set( v, pTokens, pIndex = 0 ) {
+				if( pIndex === pTokens.length ) { return }
+				v = ( typeof v === 'undefined' ? {} : shallowCopy( v ) ) as Readonly<T>;
+				obj = v;
+				// @ts-expect-error
+				v[ pTokens[ pIndex ] ] = _set( v[ pTokens[ pIndex ] ], pTokens, pIndex + 1 );
+				return v;
+			} )( this._rootAtomNode._sectionData, this._pathToRootAtom );
+			obj[ this._pathToRootAtom.at( -1 ) ] = v;
+			makePathReadonly( this._rootAtomNode._sectionData, this._pathToRootAtom, true );
+			this._rootAtomNode._sectionData = Object.freeze( this._rootAtomNode._sectionData );
 		}
 		this._retainUnchangedDescendants( previousRootAtomValue );
 	}
@@ -108,14 +119,15 @@ class AtomNode<T extends Value>{
 	}
 
 	insertAtomAt(
-		fullPath : Array<string>,
+		sanitizedPathId : number,
 		pathRepo : PathsRepo,
 		origin : T
 	) {
+		const fullPath = pathRepo.getPathTokensAt( sanitizedPathId );
 		let node = this._findRoot();
 		if( fullPath[ 0 ] === GLOBAL_SELECTOR ) {
 			return node._activateNodeWith({
-				dottedPathId: pathRepo.getIdOfSanitizedPath( GLOBAL_SELECTOR ),
+				dottedPathId: sanitizedPathId,
 				pathRepo
 			}, origin );
 		}
@@ -125,16 +137,13 @@ class AtomNode<T extends Value>{
 			if( key in node._branches ) {
 				node = node._branches[ key ];
 				if( !node.isActive ) { continue }
-				return node._addAtomNodeAt( fullPath, origin );
+				return node._addAtomNodeAt( sanitizedPathId, origin );
 			}
 			node._branches[ key ] = new AtomNode<T>( key, node );
 			node = node._branches[ key ];
 		}
 		key = fullPath.at( -1 );
-		const pathSource = {
-			dottedPathId: pathRepo.getIdOfSanitizedPath( fullPath.join( '.' ) ),
-			pathRepo
-		};
+		const pathSource = { dottedPathId: sanitizedPathId, pathRepo };
 		if( key in node._branches ) {
 			return node._branches[ key ]._activateNodeWith( pathSource, origin );
 		}
@@ -163,12 +172,11 @@ class AtomNode<T extends Value>{
 	}
 	
 	/**
-	 * This value change propagates through descendant atoms. To avoid redundant
-	 * operations, it is advisable to call this once on any node within a
-	 * rootAtomNode section.
+	 * This method allow user, from any node, to call set the value of an atom bearing node residing at or near the fullPath.\
+	 * Not to be confused with the value setter property which must be called on an atom bearing node to assign it a new value.
 	 * 
-	 * @param {Array<string>} fullPath - a path in node to set: must be a suffix of and longer than `this.fullPath`
-	 * @param value
+	 * @param {Array<string>} fullPath - the complete path tokens corresponding to the property location in the overall data object
+	 * @param {Readonly<T>} value - a change object of type Partial<typeof overall data object>
 	 */
 	setValueAt( fullPath : Array<string>, value : Readonly<T> ) {
 		let node = this._findRoot();
@@ -189,14 +197,17 @@ class AtomNode<T extends Value>{
 			node = node._branches[ key ];
 			if( node.isActive ) { activeNode = node }
 		}
-		if( !activeNode ) { return }
-		const nodePathLen = activeNode.fullPath.length;
-		if( fullPath.length === nodePathLen ) {
-			activeNode.value = value;
+		if( !activeNode ) {
+			if( node.isRoot ) { return }
+			for( let dNodes = node._findNearestActiveDescendants(), d = dNodes.length; d--; ) {
+				if( !dNodes[ d ].isRootAtom ) { continue }
+				dNodes[ d ].value = get( value, dNodes[ d ].fullPath )._value as Readonly<T>;
+			}
 			return;
 		}
-		if( fullPath.length < nodePathLen ) {
-			activeNode.value = get( value, activeNode.fullPath )._value as Readonly<T>;
+		const nodePathLen = activeNode.fullPath.length;
+		if( fullPath.length <= nodePathLen ) {
+			activeNode.value = get( value, fullPath )._value as Readonly<T>;;
 			return;
 		}
 		const _newValue = shallowCopy( activeNode.value ) as T;
@@ -208,12 +219,13 @@ class AtomNode<T extends Value>{
 
 	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
 	@activeNodesOnly
-	private _addAtomNodeAt( fullPath : Array<string>, origin : T ) {
+	private _addAtomNodeAt( sanitizedPathId : number, origin : T ) {
+		const fullPath = this._fullPathRepo.getPathTokensAt( sanitizedPathId );
 		if( isAPrefixOfB( this.fullPath, fullPath ) ) {
-			return this._addActiveDescendantNodeAt( fullPath );
+			return this._addActiveDescendantNodeAt( sanitizedPathId );
 		}
 		if( isAPrefixOfB( fullPath, this.fullPath ) ) {
-			return this._addAncestorAtomNodeAt( fullPath, origin );
+			return this._addAncestorAtomNodeAt( sanitizedPathId, origin );
 		}
 		throw new Error( `\`fullPath\` argument must either be \`["${ GLOBAL_SELECTOR }"]\` a prefix or suffix of the \`fullPath\` of this node.` );
 	}
@@ -222,29 +234,32 @@ class AtomNode<T extends Value>{
 	 * applicable only to nodes containing atoms: assert
 	 * via a `this.isActive` check.
 	 * 
-	 * @param {Array<string>} fullPath - must be a prefix of and shorter than `this.fullPath`
+	 * @param {number} sanitizedPathId - must be an id to a path in pathRepo which is prefix of and shorter than `this.fullPath`
 	 */
 	@activeNodesOnly
-	private _addAncestorAtomNodeAt( fullPath : Array<string>, origin : T ) : void {
+	private _addAncestorAtomNodeAt( sanitizedPathId : number, origin : T ) : void {
 		if( !this.isRootAtom ) {
-			return this.rootAtomNode._addAncestorAtomNodeAt( fullPath, origin );
+			return this.rootAtomNode._addAncestorAtomNodeAt( sanitizedPathId, origin );
 		}
+		const fullPath = this._fullPathRepo.getPathTokensAt( sanitizedPathId );
 		let isNewRootAtom = isAPrefixOfB( fullPath, this.fullPath );
 		if( isNewRootAtom && fullPath.length === this.fullPath.length ) { return }
+		const pathInfo = {
+			dottedPathId: sanitizedPathId,
+			pathRepo: this._fullPathRepo
+		};
 		let node = this._findNodeAt( fullPath );
 		const key = fullPath.at( -1 );
 		if( !isNewRootAtom ) {
-			node._head._branches[ key ] = new AtomNode<T>( key, node._head, {
-				dottedPathId: this._fullPathRepo.getIdOfSanitizedPath( fullPath.join( '.' ) ),
-				pathRepo: this._fullPathRepo
-			}, this.rootAtomNode );
+			node._head._branches[ key ] = new AtomNode<T>(
+				key, node._head, pathInfo, this.rootAtomNode
+			);
 			node._head._branches[ key ]._branches = node._branches;
 			return;
 		}
-		node._head._branches[ key ] = new AtomNode<T>( key, node._head, {
-			dottedPathId: this._fullPathRepo.getIdOfSanitizedPath( fullPath.join( '.' ) ),
-			pathRepo: this._fullPathRepo
-		}, undefined, origin );
+		node._head._branches[ key ] = new AtomNode<T>(
+			key, node._head, pathInfo, undefined, origin
+		);
 		node._head._branches[ key ]._branches = node._branches;
 		node = node._head._branches[ key ];
 		for( let descNodes = this._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
@@ -256,10 +271,11 @@ class AtomNode<T extends Value>{
 	 * applicable only to nodes containing atoms: assert
 	 * via a `this.isActive` check.
 	 * 
-	 * @param {Array<string>} fullPath - must be a suffix of and longer than `this.fullPath`
+	 * @param {number} sanitizedPathId - must be an id to path with is suffix of and longer than `this.fullPath`
 	 */
 	@activeNodesOnly
-	private _addActiveDescendantNodeAt( fullPath : Array<string> ) {
+	private _addActiveDescendantNodeAt( sanitizedPathId :number ) {
+		const fullPath = this._fullPathRepo.getPathTokensAt( sanitizedPathId );
 		let node = this.rootAtomNode;
 		for(
 			let pathToRootAtom = fullPath.slice( this.fullPath.length ),
@@ -277,14 +293,14 @@ class AtomNode<T extends Value>{
 		const key = fullPath.at( -1 );
 		if( !( key in node._branches ) ) {
 			node._branches[ key ] = new AtomNode<T>( key, node, { 
-				dottedPathId: this._fullPathRepo.getIdOfSanitizedPath( fullPath.join( '.' ) ),
+				dottedPathId: sanitizedPathId,
 				pathRepo: this._fullPathRepo
 			}, this._rootAtomNode );
 			return;
 		}
 		!node._branches[ key ].isActive &&
 		node._branches[ key ]._activateNodeWith({ 
-			dottedPathId: this._fullPathRepo.getIdOfSanitizedPath( fullPath.join( '.' ) ),
+			dottedPathId: sanitizedPathId,
 			pathRepo: this._fullPathRepo
 		}, undefined, this._rootAtomNode );
 	}
@@ -463,9 +479,9 @@ function makePathReadonly<T extends Value>(
 	path : Array<string>,
 	endAtClosestReadonlyAncestor = false
  ) {
-	let { _value : data, exists } = get( source, path );
-	if( !exists ) { return }
-	for( let p = path.length; p--; ) {
+	if( !get( source, path ).exists ) { return }
+	let data = source as {};
+	for( let pLen = path.length, p = 0; p < pLen; p++ ) {
 		data = data[ path[ p ] ];
 		if( !Object.isFrozen( data ) ) {
 			Object.freeze( data );
@@ -480,19 +496,16 @@ function makePathWriteable<T extends Value>(
 	path : Array<string>,
 	startAtClosestWriteableAncestor = false
  ) {
-	let { _value : target, exists } = get( source, path );
-	if( !exists ) { return }
-	if( Object.isFrozen( source ) ) {
-		source = shallowCopy( source ) as T
-	}
-	let p = -1;
-	while( source !== target ) {
-		const key = path[ ++p ];
-		if( Object.isFrozen( source[ key ] ) ) {
-			source[ key ] = shallowCopy( source[ key ] );
-		} else if( startAtClosestWriteableAncestor ) { return }
-		source = source[ key ] as T;
-	} 
+	if( !get( source, path ).exists ) { return }
+	source = ( function make( s, p : Array<string>, i = 0 ) {
+		let retVal = s;
+		if( !Object.isFrozen( retVal ) ) {
+			if( startAtClosestWriteableAncestor ) { return retVal as T }
+		} else { retVal = shallowCopy( retVal ) as T }
+		s[ p[ i ] ] = make( s[ p[ i ] ] as T, p, i + 1 );
+		return retVal as T;
+	} )( source, path );
+	return source;
 }
 
 function shallowCopy( data : unknown ) : unknown {

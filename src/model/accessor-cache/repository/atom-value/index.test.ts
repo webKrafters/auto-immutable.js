@@ -24,7 +24,7 @@ describe( '1xxxx', () => {
 	let pathRepo : PathRepository;
 	beforeAll(() => {
 		sourceData = {};
-		pathRepo = {} as PathRepository;
+		pathRepo = { getPathTokensAt: jest.fn(() => 1) } as unknown as PathRepository;
 		atomValue = new AtomValue<{}>( sourceData, pathRepo );
 	});
 	test( 'creates an atom', () => expect( atomValue ).toBeInstanceOf( AtomValue ) );
@@ -39,23 +39,15 @@ describe( '1xxxx', () => {
 		let tokenizedPath : Array<string>;
 		beforeAll(() => { tokenizedPath = [ 'a', 'b', 'c' ] });
 		describe( 'addDataForAtomAt(...)', () => {
-			let insertAtomSpy : jest.SpyInstance<any, [Array<string>, PathRepository, {}], any>;
+			let insertAtomSpy : jest.SpyInstance<any, [number, PathRepository, {}], any>;
 			beforeAll(() => {
 				insertAtomSpy = jest.spyOn( AtomNode.prototype, 'insertAtomAt' ).mockImplementation();
 			});
 			beforeEach(() => { insertAtomSpy.mockClear() });
 			afterAll(() => { insertAtomSpy.mockRestore() });
-			test( 'will register atom using tokenized path', () => {
-				atomValue.addDataForAtomAt( tokenizedPath );
-				expect( insertAtomSpy ).toHaveBeenCalledWith(
-					tokenizedPath, pathRepo, sourceData
-				);
-			} );
-			test( 'will register atom using a dot separated path string', () => {
-				atomValue.addDataForAtomAt( tokenizedPath.join( '.' ) );
-				expect( insertAtomSpy ).toHaveBeenCalledWith(
-					tokenizedPath, pathRepo, sourceData
-				);
+			test( 'registers atom at node referenced by tokenized path `id`', () => {
+				atomValue.addDataForAtomAt( 1 );
+				expect( insertAtomSpy ).toHaveBeenCalledWith( 1, pathRepo, sourceData );
 			} );
 		} );
 		describe( 'getAtomAt(...)', () => {
@@ -65,13 +57,9 @@ describe( '1xxxx', () => {
 			});
 			beforeEach(() => { findActiveNodeSpy.mockClear() });
 			afterAll(() => { findActiveNodeSpy.mockRestore() });
-			test( 'searches for a node holding an atom using tokenized path', () => {
-				atomValue.getAtomAt( tokenizedPath );
-				expect( findActiveNodeSpy ).toHaveBeenCalledWith( tokenizedPath );
-			} );
-			test( 'searches for a node holding an atom using a dot separated path string', () => {
-				atomValue.getAtomAt( tokenizedPath.join( '.' ) );
-				expect( findActiveNodeSpy ).toHaveBeenCalledWith( tokenizedPath );
+			test( 'searches for a node holding an atom at tokenized path id', () => {
+				atomValue.getAtomAt( 1 );
+				expect( findActiveNodeSpy ).toHaveBeenCalledWith( 1 );
 			} );
 		} );
 		describe( 'getValueAt(...)', () => {
@@ -93,14 +81,9 @@ describe( '1xxxx', () => {
 				valueGetterSpy.mockRestore();
 				findActiveNodeSpy.mockRestore();
 			});
-			test( 'searches and returns the value at node holding an atom using tokenized path', () => {
-				atomValue.getValueAt( tokenizedPath );
-				expect( findActiveNodeSpy ).toHaveBeenCalledWith( tokenizedPath );
-				expect( valueGetterSpy ).toHaveBeenCalledTimes( 1 );
-			} );
-			test( 'searches and returns the value at node holding an atom using a dot separated path string', () => {
-				atomValue.getValueAt( tokenizedPath.join( '.' ) );
-				expect( findActiveNodeSpy ).toHaveBeenCalledWith( tokenizedPath );
+			test( 'searches and returns the value at node holding an atom at tokenized path `id`', () => {
+				atomValue.getValueAt( 1 );
+				expect( findActiveNodeSpy ).toHaveBeenCalledWith( 1 );
 				expect( valueGetterSpy ).toHaveBeenCalledTimes( 1 );
 			} );
 		} );
