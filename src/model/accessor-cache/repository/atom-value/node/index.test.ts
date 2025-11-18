@@ -98,9 +98,28 @@ describe( '1xxxx', () => {
 					expect( node.value ).toEqual( value );
 				} );
 				test( 'ensures that set value is readonly', () => {
-					const { root } = createTestAtomArtifact({} as Data);
-					const node = root.findActiveNodeAt([ 'q', 'r', 's', 't' ])!;
-					const value = {
+					let { root } = createTestAtomArtifact({} as Data);
+					let node = root.findActiveNodeAt([ 'q', 'r', 's', 't' ])!;
+					let value = {
+						c: { j: 'testing' },
+						e: 33,
+						i: [ 2, 5, 4, 2 ]
+					} as unknown as typeof node.value;
+					node.value = value;
+					expect( Object.isFrozen( node.value ) ).toBe( true );
+					// @ts-ignore
+					expect( Object.isFrozen( node.value.e ) ).toBe( true );
+					// @ts-ignore
+					expect( Object.isFrozen( node.value.i[ 3 ] ) ).toBe( true );
+					// @ts-ignore
+					expect( Object.isFrozen( node.value.c.j ) ).toBe( true );
+
+					// ----- for updating existing data -----
+					
+					const { root: root1 } = createTestAtomArtifact( getChangeData() );
+					root = root1
+					node = root.findActiveNodeAt([ 'q', 'r', 's', 't' ])!;
+					value = {
 						c: { j: 'testing' },
 						e: 33,
 						i: [ 2, 5, 4, 2 ]
@@ -115,9 +134,9 @@ describe( '1xxxx', () => {
 					expect( Object.isFrozen( node.value.c.j ) ).toBe( true );
 				} );
 				test( 'ensures that all atom values of atoms up the are readonly', () => {
-					const { root } = createTestAtomArtifact({} as Data);
-					const node = root.findActiveNodeAt([ 'a', 'b', 'c', 'd', 'e' ])!;
-					const value = { message: 'this is the test....' } as unknown as typeof node.value;
+					let { root } = createTestAtomArtifact({} as Data);
+					let node = root.findActiveNodeAt([ 'a', 'b', 'c', 'd', 'e' ])!;
+					let value = { message: 'this is the test....' } as unknown as typeof node.value;
 					node.value = value;
 					expect( Object.isFrozen( node.value ) ).toBe( true );
 					( function isReadonly( v : Record<string,{}> ) {
@@ -127,6 +146,67 @@ describe( '1xxxx', () => {
 						) { return }
 						for( let k in v ) { isReadonly( v[ k ] ) }
 					} )( node.rootAtomNode.value );
+
+					// ----- for updating existing data -----
+					
+					const { root: root1 } = createTestAtomArtifact( getChangeData() );
+					root = root1
+					node = root.findActiveNodeAt([ 'a', 'b', 'c', 'd', 'e' ])!;
+					value = { message: 'this is the test....' } as unknown as typeof node.value;
+					node.value = value;
+					expect( Object.isFrozen( node.value ) ).toBe( true );
+					( function isReadonly( v : Record<string,{}> ) {
+						expect( Object.isFrozen( v ) ).toBe( true );
+						if( Object.prototype.toString.call( v ) === '[object String]'
+							|| !Object.keys( v ).length
+						) { return }
+						for( let k in v ) { isReadonly( v[ k ] ) }
+					} )( node.rootAtomNode.value );
+				} );
+				test( 'ensures that unaffected atoms retain their original value object references', () => {
+					const { root } = createTestAtomArtifact({} as Data );
+					const node_t = root.findActiveNodeAt([ 't' ])!;
+					// 't' -- affected by change
+					// 't.u.v.w' -- unaffected
+					// 't.u.z' -- affected
+					// 't.y' -- affected by change
+					node_t.value = {
+						t: {
+							...node_t.value.t,
+							u: {
+								...node_t.value.t.u,
+								v: {
+									...node_t.value.t.u.v,
+									d: 82
+								}
+							},
+							y: {
+								...node_t.value.t.y,
+								q: 99
+							}
+						}
+					} as unknown as Data;
+
+
+
+
+
+
+
+					const node = root.findActiveNodeAt([ 'q', 'r', 's', 't' ])!;
+					const value = {
+						c: { j: 'testing' },
+						e: 33,
+						i: [ 2, 5, 4, 2 ]
+					} as unknown as typeof node.value;
+					node.value = value;
+					expect( Object.isFrozen( node.value ) ).toBe( true );
+					// @ts-ignore
+					expect( Object.isFrozen( node.value.e ) ).toBe( true );
+					// @ts-ignore
+					expect( Object.isFrozen( node.value.i[ 3 ] ) ).toBe( true );
+					// @ts-ignore
+					expect( Object.isFrozen( node.value.c.j ) ).toBe( true );
 				} );
 			} );
 		} );

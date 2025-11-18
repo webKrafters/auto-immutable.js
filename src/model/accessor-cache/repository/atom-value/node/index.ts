@@ -99,7 +99,7 @@ class AtomNode<T extends Value>{
 				return v;
 			} )( this._rootAtomNode._sectionData, this._pathToRootAtom );
 			obj[ this._pathToRootAtom.at( -1 ) ] = v;
-			makePathReadonly( this._rootAtomNode._sectionData, this._pathToRootAtom, true );
+			makePathReadonly( this._rootAtomNode._sectionData, this._pathToRootAtom );
 			this._rootAtomNode._sectionData = Object.freeze( this._rootAtomNode._sectionData );
 		}
 		this._retainUnchangedDescendants( previousRootAtomValue );
@@ -212,7 +212,7 @@ class AtomNode<T extends Value>{
 		}
 		const _newValue = shallowCopy( activeNode.value ) as T;
 		const relPath = fullPath.slice( nodePathLen );
-		makePathWriteable( _newValue, relPath );
+		makePathWriteable({ value: _newValue }, relPath );
 		set( _newValue, relPath, get( value, fullPath )._value );
 		activeNode.value = _newValue;
 	}
@@ -338,7 +338,7 @@ class AtomNode<T extends Value>{
 		this._rootAtomNode = rootAtomNode;
 		this._pathToRootAtom = this.fullPath.slice( rootAtomNode.fullPath.length );
 		if( !this._sectionData ) { return }
-		makePathWriteable( rootAtomNode._sectionData, this._pathToRootAtom, true );
+		makePathWriteable({ value: rootAtomNode._sectionData }, this._pathToRootAtom );
 		set( rootAtomNode._sectionData, this._pathToRootAtom, this._sectionData );
 		this._sectionData = null;
 	}
@@ -445,7 +445,7 @@ class AtomNode<T extends Value>{
 	private _retainUnchangedDescendants( previouRootAtomValue : T ) {
 		const taskArgs : Array<[ AtomNode<T>, Array<string> ]> = [];
 		for( const { _pathToRootAtom, rootAtomNode } of this._curateUnchangedAtoms( previouRootAtomValue ) ) {
-			makePathWriteable( rootAtomNode._sectionData, _pathToRootAtom, true );
+			makePathWriteable({ value: rootAtomNode._sectionData }, _pathToRootAtom );
 			set(
 				rootAtomNode._sectionData,
 				_pathToRootAtom,
@@ -476,8 +476,7 @@ function activeNodesOnly<C>( method: Function, context: C ) {
 /** makes path in `source` readonly */
 function makePathReadonly<T extends Value>(
 	source : T,
-	path : Array<string>,
-	endAtClosestReadonlyAncestor = false
+	path : Array<string>
  ) {
 	if( !get( source, path ).exists ) { return }
 	let data = source as {};
@@ -487,25 +486,34 @@ function makePathReadonly<T extends Value>(
 			Object.freeze( data );
 			continue;
 		}
-		if( endAtClosestReadonlyAncestor ) { return }
 	}
 }
 
+/**
+ * 
+ * @param {{ value: T }} source - wrapper around the value to make writeable
+ * @param {Array<string>} path - object path in the value object to make writeable
+ * @returns 
+ */
 function makePathWriteable<T extends Value>(
-	source : T,
-	path : Array<string>,
-	startAtClosestWriteableAncestor = false
+	source : { value: T },
+	path : Array<string>
  ) {
-	if( !get( source, path ).exists ) { return }
-	source = ( function make( s, p : Array<string>, i = 0 ) {
+	const origValue = source.value;
+	let exists = true;
+	source.value = ( function make( s, p : Array<string>, i = 0 ) {
+		if( i < p.length && !( p[ i ] in s ) ) {
+			exists = false;
+			return;
+		}
 		let retVal = s;
-		if( !Object.isFrozen( retVal ) ) {
-			if( startAtClosestWriteableAncestor ) { return retVal as T }
-		} else { retVal = shallowCopy( retVal ) as T }
-		s[ p[ i ] ] = make( s[ p[ i ] ] as T, p, i + 1 );
+		if( Object.isFrozen( retVal ) ) {
+			retVal = shallowCopy( retVal ) as T
+		}
+		s[ p[ i ] ] = make( retVal[ p[ i ] ] as T, p, i + 1 );
 		return retVal as T;
-	} )( source, path );
-	return source;
+	} )( source.value, path );
+	if( !exists ) { source.value = origValue };
 }
 
 function shallowCopy( data : unknown ) : unknown {
