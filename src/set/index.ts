@@ -9,8 +9,6 @@ import {
 } from '..';
 
 import isEqual from 'lodash.isequal';
-import isPlainObject from 'lodash.isplainobject';
-import setProperty from 'lodash.set';
 
 import clonedeep from '@webkrafters/clone-total';
 import getProperty from '@webkrafters/get-property';
@@ -18,7 +16,9 @@ import getProperty from '@webkrafters/get-property';
 import {
 	arrangePropertyPaths,
 	isDataContainer,
-	makeReadonly
+	isPlainObject,
+	makeReadonly,
+	set as setProperty
 } from '../utils';
 
 import tagFunctions, {
@@ -278,18 +278,14 @@ function distillChanges<T extends object>(
 		path = path.slice( 1 );
 		propertyPathMap[ path.join( '.' ) ] = path;
 	}
-	const changes = {};
+	let changes = {};
 	const paths : Array<Array<string>> = [];
 	for( const path of arrangePropertyPaths(
 		Object.keys( propertyPathMap )
 	) ) {
 		let pathTokens = propertyPathMap[ path ];
 		paths.push( pathTokens as string[] );
-		setProperty(
-			changes,
-			pathTokens,
-			getProperty( source, pathTokens )._value
-		);
+		changes = setProperty( changes, pathTokens, getProperty( source, pathTokens )._value );
 	}
 	return { changes, paths };
 }

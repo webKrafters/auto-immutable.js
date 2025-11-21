@@ -3,7 +3,7 @@ import type {
 	AccessorResponse,
 	Value
 } from '../..';
-import { makeReadonly } from '../../utils';
+
 import AtomValueRepository from '../accessor-cache/repository/atom-value';
 
 import PathRepository from '../accessor-cache/repository/paths';

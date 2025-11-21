@@ -5,10 +5,11 @@ import {
 	test
 } from '@jest/globals';
 
+import { GLOBAL_SELECTOR } from '../../../../../constants';
+import { set } from '../../../../../utils';
 import PathRepository from '../../paths';
 import Atom from '../../../../atom';
 import AtomNode from '.';
-import { GLOBAL_SELECTOR } from '../../../../../constants';
 
 type Data = ReturnType<typeof getChangeData>;
 
@@ -16,7 +17,7 @@ type Data = ReturnType<typeof getChangeData>;
 // "(\w+)": --- $1:
 // Any<(\w+)> --- expect.any( $1 ) //
 // console.info( onChangeMock.mock.calls[ 0 ] );
-describe( '1xxxx', () => {
+describe( '1xxxxj', () => {
 // describe( 'AtomNode class', () => {
 	describe( 'root node', () => {
 		let rootNode : AtomNode<Data>;
@@ -163,50 +164,87 @@ describe( '1xxxx', () => {
 						for( let k in v ) { isReadonly( v[ k ] ) }
 					} )( node.rootAtomNode.value );
 				} );
-				test( 'ensures that unaffected atoms retain their original value object references', () => {
-					const { root } = createTestAtomArtifact({} as Data );
-					const node_t = root.findActiveNodeAt([ 't' ])!;
-					// 't' -- affected by change
-					// 't.u.v.w' -- unaffected
-					// 't.u.z' -- affected
-					// 't.y' -- affected by change
-					node_t.value = {
-						t: {
-							...node_t.value.t,
-							u: {
-								...node_t.value.t.u,
-								v: {
-									...node_t.value.t.u.v,
-									d: 82
-								}
-							},
-							y: {
-								...node_t.value.t.y,
-								q: 99
-							}
-						}
-					} as unknown as Data;
+				test( '1xxxxc', () => {
+				// test( 'ensures that unaffected atoms retain their original value object references', () => {
+					const createTestUpdatePayload = ( currentState : Data ) : Data => {
+						let data = { ...currentState };
+						data = set( data, [ 't', 'u', 'v', 'd' ], 82 ) as Data;
+						data = set( data, [ 't', 'y', 'q' ], 99 ) as Data;
+						return data;
+					}
 
+					let node_t : AtomNode<Data>;
+					let node_tuvw : AtomNode<Data>;
+					let node_tuz : AtomNode<Data>;
+					let node_ty : AtomNode<Data>;
 
+					let value_t : Data;
+					let value_tuvw : Data;
+					let value_tuz : Data;
+					let value_ty : Data;
 
+					{
+						const { root } = createTestAtomArtifact({} as Data );
 
+						node_t = root.findActiveNodeAt([ 't' ])!;
+						node_tuvw = root.findActiveNodeAt([ 't', 'u', 'v', 'w' ])!;
+						node_tuz = root.findActiveNodeAt([ 't', 'u', 'z' ])!;
+						node_ty = root.findActiveNodeAt([ 't', 'y' ])!;
 
+						value_t = node_t.value;
+						value_tuvw = node_tuvw.value;
+						value_tuz = node_tuz.value;
+						value_ty = node_ty.value;
 
+						expect( value_t ).toBeUndefined();
+						expect( value_tuvw ).toBeUndefined();
+						expect( value_tuz ).toBeUndefined();
+						expect( value_ty ).toBeUndefined();
 
-					const node = root.findActiveNodeAt([ 'q', 'r', 's', 't' ])!;
-					const value = {
-						c: { j: 'testing' },
-						e: 33,
-						i: [ 2, 5, 4, 2 ]
-					} as unknown as typeof node.value;
-					node.value = value;
-					expect( Object.isFrozen( node.value ) ).toBe( true );
-					// @ts-ignore
-					expect( Object.isFrozen( node.value.e ) ).toBe( true );
-					// @ts-ignore
-					expect( Object.isFrozen( node.value.i[ 3 ] ) ).toBe( true );
-					// @ts-ignore
-					expect( Object.isFrozen( node.value.c.j ) ).toBe( true );
+						const newChanges = createTestUpdatePayload( {} as Data );
+						node_t.value = newChanges.t as unknown as Data;
+
+						expect( node_t.value ).not.toBe( value_t ); // affected by change
+						expect( node_tuvw.value ).toBe( value_tuvw );
+						expect( node_tuz.value ).toBe( value_tuz );
+						expect( node_ty.value ).not.toBe( value_ty );  // affected by change
+
+						expect( node_t.value ).toEqual( newChanges.t );
+						expect( node_ty.value ).toEqual( newChanges.t.y ); 
+					}
+
+					// ----- for updating existing data -----
+					
+					{
+						const data = getChangeData();
+						const { root } = createTestAtomArtifact( data );
+
+						node_t = root.findActiveNodeAt([ 't' ])!;
+						node_tuvw = root.findActiveNodeAt([ 't', 'u', 'v', 'w' ])!;
+						node_tuz = root.findActiveNodeAt([ 't', 'u', 'z' ])!;
+						node_ty = root.findActiveNodeAt([ 't', 'y' ])!;
+
+						value_t = node_t.value;
+						value_tuvw = node_tuvw.value;
+						value_tuz = node_tuz.value;
+						value_ty = node_ty.value;
+
+						expect( value_t ).toStrictEqual( data.t );
+						expect( value_tuvw ).toStrictEqual( data.t.u.v.w );
+						expect( value_tuz ).toStrictEqual( data.t.u.z );
+						expect( value_ty ).toStrictEqual( data.t.y );
+
+						const newChanges = createTestUpdatePayload( getChangeData() );
+						node_t.value = newChanges.t as unknown as Data;
+
+						expect( node_t.value ).not.toBe( value_t ); // affected by change
+						expect( node_tuvw.value ).toBe( value_tuvw );
+						expect( node_tuz.value ).toBe( value_tuz );
+						expect( node_ty.value ).not.toBe( value_ty );  // affected by change
+
+						expect( node_t.value ).toEqual( newChanges.t );
+						expect( node_ty.value ).toEqual( newChanges.t.y ); 
+					}
 				} );
 			} );
 		} );
@@ -554,7 +592,8 @@ describe( '1xxxx', () => {
 				root.setValueAt( [ 'w', 'x', 'y', 'z' ], testChanges );
 				expect( valueSetterSpy ).not.toHaveBeenCalled();
 			} );
-			test( 'applies changes on paths not matching any atom path to the closest atom bearing ancestor', () => {
+			test( '1xxxxm', () => {
+			// test( 'applies changes on paths not matching any atom path to the closest atom bearing ancestor', () => {
 				testChanges.a.b.c.d = {
 					...testChanges.a.b.c.d,
 					w: { x: { y: { z: {} } } }

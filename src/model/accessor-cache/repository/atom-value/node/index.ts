@@ -5,19 +5,21 @@ export interface FullPathSource {
 	pathRepo: PathsRepo;
 };
 
-import set from 'lodash.set';
-
 import get from '@webkrafters/get-property';
 import cloneDeep from '@webkrafters/clone-total';
 
 import { GLOBAL_SELECTOR } from '../../../../..';
 
-import { isAPrefixOfB } from '../util';
+import {
+	isAPrefixOfB,
+	isPlainObject,
+	set,
+	shallowCopy
+} from '../../../../../utils';
 
 import PathsRepo from '../../paths';
 
 import Atom from '../../../../atom';
-import { makeReadonly } from '../../../../../utils';
 
 class AtomNode<T extends Value>{
 
@@ -69,9 +71,11 @@ class AtomNode<T extends Value>{
 	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
 	@activeNodesOnly
 	get value() {
-		return !this.isRootAtom
-			? get( this._rootAtomNode._sectionData, this._pathToRootAtom )._value as Readonly<T>
-			: this._sectionData;
+		if( this.isRootAtom ) { return this._sectionData }
+		return get(
+			this._rootAtomNode._sectionData,
+			this._pathToRootAtom
+		)._value as Readonly<T>
 	}
 	/**
 	 * applicable only to nodes containing atoms: assert via a 
@@ -85,22 +89,15 @@ class AtomNode<T extends Value>{
 	 */
 	@activeNodesOnly
 	set value( v : Readonly<T> ) {
-		const previousRootAtomValue = shallowCopy( this._rootAtomNode.value ) as T;
+		const previousRootAtomValue = shallowCopy( this._rootAtomNode.value );
 		if( this.isRootAtom ) {
 			this._sectionData = Object.freeze( v );
 		} else {
-			let obj;
-			this._rootAtomNode._sectionData = ( function _set( v, pTokens, pIndex = 0 ) {
-				if( pIndex === pTokens.length ) { return }
-				v = ( typeof v === 'undefined' ? {} : shallowCopy( v ) ) as Readonly<T>;
-				obj = v;
-				// @ts-expect-error
-				v[ pTokens[ pIndex ] ] = _set( v[ pTokens[ pIndex ] ], pTokens, pIndex + 1 );
-				return v;
-			} )( this._rootAtomNode._sectionData, this._pathToRootAtom );
-			obj[ this._pathToRootAtom.at( -1 ) ] = v;
-			makePathReadonly( this._rootAtomNode._sectionData, this._pathToRootAtom );
-			this._rootAtomNode._sectionData = Object.freeze( this._rootAtomNode._sectionData );
+			this._rootAtomNode._sectionData = set(
+				this._rootAtomNode._sectionData,
+				this._pathToRootAtom,
+				v
+			) as Readonly<T>;
 		}
 		this._retainUnchangedDescendants( previousRootAtomValue );
 	}
@@ -207,14 +204,18 @@ class AtomNode<T extends Value>{
 		}
 		const nodePathLen = activeNode.fullPath.length;
 		if( fullPath.length <= nodePathLen ) {
-			activeNode.value = get( value, fullPath )._value as Readonly<T>;;
+			activeNode.value = get( value, fullPath )._value as Readonly<T>;
 			return;
 		}
-		const _newValue = shallowCopy( activeNode.value ) as T;
-		const relPath = fullPath.slice( nodePathLen );
-		makePathWriteable({ value: _newValue }, relPath );
-		set( _newValue, relPath, get( value, fullPath )._value );
-		activeNode.value = _newValue;
+
+		// @debug
+		console.info( 'are we here ???? new value  >> ', get( value, fullPath )._value );
+			
+		activeNode.value = set(
+			activeNode.value,
+			fullPath.slice( nodePathLen ),
+			get( value, fullPath )._value
+		) as Readonly<T>;
 	}
 
 	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
@@ -338,8 +339,11 @@ class AtomNode<T extends Value>{
 		this._rootAtomNode = rootAtomNode;
 		this._pathToRootAtom = this.fullPath.slice( rootAtomNode.fullPath.length );
 		if( !this._sectionData ) { return }
-		makePathWriteable({ value: rootAtomNode._sectionData }, this._pathToRootAtom );
-		set( rootAtomNode._sectionData, this._pathToRootAtom, this._sectionData );
+		rootAtomNode._sectionData = set(
+			rootAtomNode._sectionData,
+			this._pathToRootAtom,
+			this._sectionData
+		) as Readonly<T>;
 		this._sectionData = null;
 	}
 
@@ -351,17 +355,49 @@ class AtomNode<T extends Value>{
 		}	
 	}
 
-	private _curateUnchangedAtoms( previouRootAtomValue : T ){
+	private _curateUnchangedAtoms( previousRootAtomValue : T ){
 		const rootAtomNode = this._rootAtomNode;
 		const nextRootAtomValue = rootAtomNode._sectionData;
 		const curatedNodes = new Set<AtomNode<T>>();
+		let atomNode : AtomNode<T>;
+
+		// @debug
+		// console.info( 'previous Root Atom Value >>>>> ', previousRootAtomValue );
+		// console.info( 'next Root Atom Value >>>>> ', nextRootAtomValue );
+		// console.info();
+			
+
 		( function areEqual( pVal : T, nVal : Readonly<T>, path : Array<string> ) {
+
+
+			
+					
+
+			// @debug
+			console.info( 'in here with .....', pVal, ' .... ', nVal );
+
+
 			const nLen = Object.keys( nVal ?? 0 ).length;
 			const pLen = Object.keys( pVal ?? 0 ).length;
 			if( !pLen || !nLen ) {
-				if( pVal !== nVal ) { return false }
-				curatedNodes.add( rootAtomNode._findNodeAt( path )._findClosestActiveAncestor() );
-				return true;
+				if( !pLen && !nLen && (
+					pVal === nVal ||
+					( isPlainObject( pVal ) && isPlainObject( nVal ) ) || 
+					( Array.isArray( pVal ) && Array.isArray( nVal ) ) 
+				) ) {
+					atomNode = rootAtomNode._findNodeAt( path );
+					atomNode && curatedNodes.add(
+						!atomNode.isActive
+							? atomNode._findClosestActiveAncestor()
+							: atomNode
+					);
+					return true;
+				}
+
+				// @debug
+				console.info( 'returning here .....', pVal, ' .... ', nVal );
+
+				return false;
 			}
 			let equal = true;
 			for( let k in nVal ) {
@@ -372,9 +408,20 @@ class AtomNode<T extends Value>{
 				) ) { equal = false }
 			}
 			if( !equal || nLen !== pLen ) { return false }
-			curatedNodes.add( rootAtomNode._findNodeAt( path )._findClosestActiveAncestor() );
+			atomNode = rootAtomNode._findNodeAt( path );
+			atomNode && curatedNodes.add(
+				!atomNode.isActive
+					? atomNode._findClosestActiveAncestor()
+					: atomNode
+			);
 			return true;
-		} )( previouRootAtomValue, nextRootAtomValue, [] );
+		} )( previousRootAtomValue, nextRootAtomValue, [] );
+
+		// @debug
+		console.info( 'found curated nodes >>>>> ', curatedNodes );
+		console.info( '.'.repeat( 33 ) );
+		console.info();
+
 		return curatedNodes;
 	}
 
@@ -386,7 +433,7 @@ class AtomNode<T extends Value>{
 		!head.isActive && head.isLeaf && head._destroy();
 	}
 
-	/** produces the closest `atomNode` ancestor to the `propertyPath` tokens provided. */
+	/** produces the closest `atomNode` ancestor to this node. */
 	private _findClosestActiveAncestor() : AtomNode<T> {
 		if( this.isRoot ){ return null }
 		let node : AtomNode<T> = this;
@@ -442,20 +489,21 @@ class AtomNode<T extends Value>{
 		return head;
 	}
 
-	private _retainUnchangedDescendants( previouRootAtomValue : T ) {
-		const taskArgs : Array<[ AtomNode<T>, Array<string> ]> = [];
-		for( const { _pathToRootAtom, rootAtomNode } of this._curateUnchangedAtoms( previouRootAtomValue ) ) {
-			makePathWriteable({ value: rootAtomNode._sectionData }, _pathToRootAtom );
-			set(
+	private _retainUnchangedDescendants( previousRootAtomValue : T ) {
+		for( const { _pathToRootAtom, rootAtomNode } of this._curateUnchangedAtoms( previousRootAtomValue ) ) {
+			
+			// @debug
+			// makePathWriteable({ value: rootAtomNode._sectionData, path: _pathToRootAtom });
+			console.info( 'we are here with path to root atom >>>>> ', _pathToRootAtom );
+			const a = get( this._rootAtomNode._sectionData, _pathToRootAtom )._value;
+			const b = get( previousRootAtomValue, _pathToRootAtom )._value;
+			console.info( 'has equal values >>>>>> ', a === b, ' ---- ', a, ' ---- ', b );
+
+			rootAtomNode._sectionData = set(
 				rootAtomNode._sectionData,
 				_pathToRootAtom,
-				get( previouRootAtomValue, _pathToRootAtom )._value
-			);
-			taskArgs.push([ rootAtomNode, _pathToRootAtom ]);
-		}
-		while( taskArgs.length ) {
-			const args = taskArgs.pop();
-			makePathReadonly( args[ 0 ]._sectionData, args[ 1 ] );
+				get( previousRootAtomValue, _pathToRootAtom )._value
+			) as Readonly<T>;
 		}
 	}
 }
@@ -471,58 +519,4 @@ function activeNodesOnly<C>( method: Function, context: C ) {
 		}
         return method.apply( this, args );
     };
-}
-
-/** makes path in `source` readonly */
-function makePathReadonly<T extends Value>(
-	source : T,
-	path : Array<string>
- ) {
-	if( !get( source, path ).exists ) { return }
-	let data = source as {};
-	for( let pLen = path.length, p = 0; p < pLen; p++ ) {
-		data = data[ path[ p ] ];
-		if( !Object.isFrozen( data ) ) {
-			Object.freeze( data );
-			continue;
-		}
-	}
-}
-
-/**
- * 
- * @param {{ value: T }} source - wrapper around the value to make writeable
- * @param {Array<string>} path - object path in the value object to make writeable
- * @returns 
- */
-function makePathWriteable<T extends Value>(
-	source : { value: T },
-	path : Array<string>
- ) {
-	const origValue = source.value;
-	let exists = true;
-	source.value = ( function make( s, p : Array<string>, i = 0 ) {
-		if( i < p.length && !( p[ i ] in s ) ) {
-			exists = false;
-			return;
-		}
-		let retVal = s;
-		if( Object.isFrozen( retVal ) ) {
-			retVal = shallowCopy( retVal ) as T
-		}
-		s[ p[ i ] ] = make( retVal[ p[ i ] ] as T, p, i + 1 );
-		return retVal as T;
-	} )( source.value, path );
-	if( !exists ) { source.value = origValue };
-}
-
-function shallowCopy( data : unknown ) : unknown {
-	if( Array.isArray( data ) ) {
-		return [ ...data ];
-	}
-	try {
-		return { ...data as {} };
-	} catch( e ) {
-		return data;
-	}
 }

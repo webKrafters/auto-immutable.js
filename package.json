@@ -20,6 +20,7 @@
     "@babel/preset-env": "^7.20.2",
     "@types/jest": "^29.5.12",
     "@types/lodash": "^4.17.0",
+    "@types/lodash.isplainobject": "^4.0.9",
     "@types/node": "^20.13.0",
     "@webkrafters/clone-total": "^1.0.1",
     "@webkrafters/get-property": "^2.0.0",
@@ -30,7 +31,6 @@
     "lodash.isempty": "^4.4.0",
     "lodash.isequal": "^4.5.0",
     "lodash.isplainobject": "^4.0.6",
-    "lodash.set": "^4.3.2",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.2"
@@ -55,8 +55,7 @@
     "lodash.clonedeepwith": ">= 0.1.0",
     "lodash.isempty": ">= 0.1.0",
     "lodash.isequal": ">= 0.1.0",
-    "lodash.isplainobject": ">= 0.8.0",
-    "lodash.set": "> 0.1.0"
+    "lodash.isplainobject": ">= 1.0.0"
   },
   "publishConfig": {
     "access": "public"

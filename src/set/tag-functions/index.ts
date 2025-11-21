@@ -39,7 +39,6 @@ type TagFunction = <
 
 import isEmpty from 'lodash.isempty';
 import isEqual from 'lodash.isequal';
-import isPlainObject from 'lodash.isplainobject';
 
 import {
 	CLEAR_TAG,
@@ -54,7 +53,7 @@ import {
 import clonedeep from '@webkrafters/clone-total';
 import getProperty from '@webkrafters/get-property';
 
-import { isDataContainer } from '../../utils/index';
+import { isDataContainer, isPlainObject } from '../../utils';
 
 /**
  * Sets a value slice to its empty value equivalent
