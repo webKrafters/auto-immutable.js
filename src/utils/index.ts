@@ -4,9 +4,11 @@ import dotize from '@webkrafters/path-dotize';
 
 import _isPlainObject from 'lodash.isplainobject';
 
-export const isPlainObject = _isPlainObject;
-
 const numberPtn = /^(?:0|(?:[1-9][0-9]*))$/;
+
+const { toString } = Object.prototype;
+
+export const isPlainObject = _isPlainObject;
 
 /**
  * Curates the most inclusive propertyPaths from a list of property paths.
@@ -56,6 +58,8 @@ export function isAPrefixOfB<T>(
 
 /** Checks if value is either a plain object or an array */
 export function isDataContainer( v ) { return isPlainObject( v ) || Array.isArray( v ) }
+
+export function isString( v ) { return toString.call( v ) === '[object String]' }
 
 /**
  * Converts argument to readonly.

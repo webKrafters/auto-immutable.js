@@ -163,6 +163,29 @@ describe( '1xxxx', () => {
 			expect( utils.isDataContainer( 1.5 ) ).toBe( false );
 		} );
 	} );
+	describe( 'isDataContainer(...)', () => {
+		test( 'is true for string literals', () => {
+			expect( utils.isString( '' ) ).toBe( true );
+		} );
+		test( 'is true for string objects', () => {
+			expect( utils.isString( new String() ) ).toBe( true );
+		} );
+		test( 'is false for non strings', () => {
+			expect( utils.isString( undefined ) ).toBe( false );
+			expect( utils.isString( null ) ).toBe( false );
+			expect( utils.isString( [] ) ).toBe( false );
+			expect( utils.isString( new Array() ) ).toBe( false ); // eslint-disable-line no-array-constructor
+			expect( utils.isString({}) ).toBe( false );
+			expect( utils.isString( new Object() ) ).toBe( false ); // eslint-disable-line no-new-object
+			expect( utils.isString( new Date() ) ).toBe( false );
+			expect( utils.isString( new Set() ) ).toBe( false );
+			expect( utils.isString( Symbol( 'test' ) ) ).toBe( false ); // eslint-disable-line no-new-wrappers
+			expect( utils.isString( new ( class Test {} )() ) ).toBe( false );
+			expect( utils.isString( true ) ).toBe( false );
+			expect( utils.isString( 1 ) ).toBe( false );
+			expect( utils.isString( 1.5 ) ).toBe( false );
+		} );
+	} );
 	describe( 'makeReadonly(...)', () => {
 		const TEST_DATA = { a: { b: { c: [ 1, 2, 3, { testFlag: true } ] } } };
 		beforeAll(() => { utils.makeReadonly( TEST_DATA ) });

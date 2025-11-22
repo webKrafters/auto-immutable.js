@@ -22,7 +22,7 @@ type Data = Value & {
 // "(\w+)": --- $1:
 // Any<(\w+)> --- expect.any( $1 ) //
 // console.info( onChangeMock.mock.calls[ 0 ] );
-describe( '1xxxx', () => {
+describe( '1xxxxr', () => {
 // sdescribe( 'Connection class', () => { 
     const setup = () => {
         const cache = new AccessorCache({});

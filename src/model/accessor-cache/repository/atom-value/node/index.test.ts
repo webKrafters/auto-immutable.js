@@ -6,7 +6,7 @@ import {
 } from '@jest/globals';
 
 import { GLOBAL_SELECTOR } from '../../../../../constants';
-import { set } from '../../../../../utils';
+import { isString, set } from '../../../../../utils';
 import PathRepository from '../../paths';
 import Atom from '../../../../atom';
 import AtomNode from '.';
@@ -17,7 +17,7 @@ type Data = ReturnType<typeof getChangeData>;
 // "(\w+)": --- $1:
 // Any<(\w+)> --- expect.any( $1 ) //
 // console.info( onChangeMock.mock.calls[ 0 ] );
-describe( '1xxxxj', () => {
+describe( '1xxxx', () => {
 // describe( 'AtomNode class', () => {
 	describe( 'root node', () => {
 		let rootNode : AtomNode<Data>;
@@ -70,8 +70,7 @@ describe( '1xxxxj', () => {
 
 			} );
 		} );
-		describe( '1xxxxa', () => {
-		// describe( 'value', () => {
+		describe( 'value', () => {
 			let pathRepo : PathRepository;
 			let root : AtomNode<{}>;
 			beforeEach(() => {
@@ -142,9 +141,7 @@ describe( '1xxxxj', () => {
 					expect( Object.isFrozen( node.value ) ).toBe( true );
 					( function isReadonly( v : Record<string,{}> ) {
 						expect( Object.isFrozen( v ) ).toBe( true );
-						if( Object.prototype.toString.call( v ) === '[object String]'
-							|| !Object.keys( v ).length
-						) { return }
+						if( isString( v ) || !Object.keys( v ).length ) { return }
 						for( let k in v ) { isReadonly( v[ k ] ) }
 					} )( node.rootAtomNode.value );
 
@@ -158,14 +155,11 @@ describe( '1xxxxj', () => {
 					expect( Object.isFrozen( node.value ) ).toBe( true );
 					( function isReadonly( v : Record<string,{}> ) {
 						expect( Object.isFrozen( v ) ).toBe( true );
-						if( Object.prototype.toString.call( v ) === '[object String]'
-							|| !Object.keys( v ).length
-						) { return }
+						if( isString( v ) || !Object.keys( v ).length) { return }
 						for( let k in v ) { isReadonly( v[ k ] ) }
 					} )( node.rootAtomNode.value );
 				} );
-				test( '1xxxxc', () => {
-				// test( 'ensures that unaffected atoms retain their original value object references', () => {
+				test( 'ensures that unaffected atoms retain their original value object references', () => {
 					const createTestUpdatePayload = ( currentState : Data ) : Data => {
 						let data = { ...currentState };
 						data = set( data, [ 't', 'u', 'v', 'd' ], 82 ) as Data;
@@ -592,8 +586,7 @@ describe( '1xxxxj', () => {
 				root.setValueAt( [ 'w', 'x', 'y', 'z' ], testChanges );
 				expect( valueSetterSpy ).not.toHaveBeenCalled();
 			} );
-			test( '1xxxxm', () => {
-			// test( 'applies changes on paths not matching any atom path to the closest atom bearing ancestor', () => {
+			test( 'applies changes on paths not matching any atom path to the closest atom bearing ancestor', () => {
 				testChanges.a.b.c.d = {
 					...testChanges.a.b.c.d,
 					w: { x: { y: { z: {} } } }

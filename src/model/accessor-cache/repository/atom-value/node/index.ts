@@ -13,6 +13,8 @@ import { GLOBAL_SELECTOR } from '../../../../..';
 import {
 	isAPrefixOfB,
 	isPlainObject,
+	isString,
+	makeReadonly,
 	set,
 	shallowCopy
 } from '../../../../../utils';
@@ -20,6 +22,8 @@ import {
 import PathsRepo from '../../paths';
 
 import Atom from '../../../../atom';
+
+const N_EXIST = Symbol( 'DOES NOT EXIST' );
 
 class AtomNode<T extends Value>{
 
@@ -90,9 +94,13 @@ class AtomNode<T extends Value>{
 	@activeNodesOnly
 	set value( v : Readonly<T> ) {
 		const previousRootAtomValue = shallowCopy( this._rootAtomNode.value );
+		let isInit = false;
 		if( this.isRootAtom ) {
-			this._sectionData = Object.freeze( v );
+			this._sectionData = v;
+			isInit = true;
 		} else {
+			let sData = this._rootAtomNode._sectionData;
+			isInit = typeof sData === 'undefined' || sData === null;
 			this._rootAtomNode._sectionData = set(
 				this._rootAtomNode._sectionData,
 				this._pathToRootAtom,
@@ -100,6 +108,20 @@ class AtomNode<T extends Value>{
 			) as Readonly<T>;
 		}
 		this._retainUnchangedDescendants( previousRootAtomValue );
+		if( isInit ) {
+			Object.freeze( makeReadonly( this._rootAtomNode._sectionData ) );
+			return;
+		}
+		let data = this._rootAtomNode._sectionData as T;
+		for( let keys = this._pathToRootAtom, kLen = keys.length, k = 0; k < kLen; k++ ) {
+			const key = keys[ k ];
+			if( !Object.isFrozen( data[ key ] ) ) {
+				Object.freeze( data[ key ] );
+			}
+			data = data[ key ] as T;
+		}
+		makeReadonly( data[ this._pathToRootAtom.at( -1 ) ] );
+		this._rootAtomNode._sectionData = Object.freeze( data );
 	}
 
 	/**
@@ -206,11 +228,7 @@ class AtomNode<T extends Value>{
 		if( fullPath.length <= nodePathLen ) {
 			activeNode.value = get( value, fullPath )._value as Readonly<T>;
 			return;
-		}
-
-		// @debug
-		console.info( 'are we here ???? new value  >> ', get( value, fullPath )._value );
-			
+		}	
 		activeNode.value = set(
 			activeNode.value,
 			fullPath.slice( nodePathLen ),
@@ -355,76 +373,6 @@ class AtomNode<T extends Value>{
 		}	
 	}
 
-	private _curateUnchangedAtoms( previousRootAtomValue : T ){
-		const rootAtomNode = this._rootAtomNode;
-		const nextRootAtomValue = rootAtomNode._sectionData;
-		const curatedNodes = new Set<AtomNode<T>>();
-		let atomNode : AtomNode<T>;
-
-		// @debug
-		// console.info( 'previous Root Atom Value >>>>> ', previousRootAtomValue );
-		// console.info( 'next Root Atom Value >>>>> ', nextRootAtomValue );
-		// console.info();
-			
-
-		( function areEqual( pVal : T, nVal : Readonly<T>, path : Array<string> ) {
-
-
-			
-					
-
-			// @debug
-			console.info( 'in here with .....', pVal, ' .... ', nVal );
-
-
-			const nLen = Object.keys( nVal ?? 0 ).length;
-			const pLen = Object.keys( pVal ?? 0 ).length;
-			if( !pLen || !nLen ) {
-				if( !pLen && !nLen && (
-					pVal === nVal ||
-					( isPlainObject( pVal ) && isPlainObject( nVal ) ) || 
-					( Array.isArray( pVal ) && Array.isArray( nVal ) ) 
-				) ) {
-					atomNode = rootAtomNode._findNodeAt( path );
-					atomNode && curatedNodes.add(
-						!atomNode.isActive
-							? atomNode._findClosestActiveAncestor()
-							: atomNode
-					);
-					return true;
-				}
-
-				// @debug
-				console.info( 'returning here .....', pVal, ' .... ', nVal );
-
-				return false;
-			}
-			let equal = true;
-			for( let k in nVal ) {
-				if( !areEqual(
-					pVal[ k ] as unknown as T,
-					nVal[ k ] as Readonly<T>,
-					[ ...path, k ]
-				) ) { equal = false }
-			}
-			if( !equal || nLen !== pLen ) { return false }
-			atomNode = rootAtomNode._findNodeAt( path );
-			atomNode && curatedNodes.add(
-				!atomNode.isActive
-					? atomNode._findClosestActiveAncestor()
-					: atomNode
-			);
-			return true;
-		} )( previousRootAtomValue, nextRootAtomValue, [] );
-
-		// @debug
-		console.info( 'found curated nodes >>>>> ', curatedNodes );
-		console.info( '.'.repeat( 33 ) );
-		console.info();
-
-		return curatedNodes;
-	}
-
 	/** handling removal of node. - discarding all dangling leaf nodes leading up to it. */
 	private _destroy() {
 		if( this.isRoot ) { return }
@@ -490,21 +438,44 @@ class AtomNode<T extends Value>{
 	}
 
 	private _retainUnchangedDescendants( previousRootAtomValue : T ) {
-		for( const { _pathToRootAtom, rootAtomNode } of this._curateUnchangedAtoms( previousRootAtomValue ) ) {
-			
-			// @debug
-			// makePathWriteable({ value: rootAtomNode._sectionData, path: _pathToRootAtom });
-			console.info( 'we are here with path to root atom >>>>> ', _pathToRootAtom );
-			const a = get( this._rootAtomNode._sectionData, _pathToRootAtom )._value;
-			const b = get( previousRootAtomValue, _pathToRootAtom )._value;
-			console.info( 'has equal values >>>>>> ', a === b, ' ---- ', a, ' ---- ', b );
-
-			rootAtomNode._sectionData = set(
-				rootAtomNode._sectionData,
-				_pathToRootAtom,
-				get( previousRootAtomValue, _pathToRootAtom )._value
-			) as Readonly<T>;
-		}
+		const atomNode = !this.isActive ? this._findClosestActiveAncestor() : this;
+		if( !atomNode ) { return }
+		const _sectionData = !atomNode.isRootAtom
+			? atomNode._rootAtomNode._sectionData
+			: atomNode._sectionData;
+		( function foundAndRestoredUnhanged<T>(
+			propValue : T,
+			prevValue : T,
+			propPath : Array<string>
+		) {
+			if( isString( propValue ) ) { return propValue === prevValue }
+			const keys = Object.keys( propValue ?? 0 );
+			const len = keys.length;
+			const pLen = Object.keys( prevValue ?? 0 ).length;
+			if( !len ) {
+				return pLen
+					? false
+					: ( isPlainObject( prevValue ) && isPlainObject( propValue ) ) ||
+						( Array.isArray( prevValue ) && Array.isArray( propValue ) ) ||
+						prevValue === propValue;
+			}
+			let allEqual = len === pLen;
+			for( const k of keys ) {
+				const path = [ ...propPath, k ];
+				const prevVal = prevValue?.[ k ] ?? N_EXIST;
+				let _eq = foundAndRestoredUnhanged( propValue[ k ], prevVal, path );
+				if( !_eq ) {
+					allEqual = false;
+				} else {
+					set( _sectionData, path, prevVal );
+				}
+			}
+			return  allEqual;
+		} )(
+			atomNode.value,
+			previousRootAtomValue,
+			atomNode._pathToRootAtom
+		);
 	}
 }
 
