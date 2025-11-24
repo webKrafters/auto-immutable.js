@@ -41,11 +41,14 @@ class AtomValueRepository<T extends Value = Value> {
 	}
 
 	mergeChanges(
-		changes : Readonly<ChangeInfo["changes"]>,
-		paths : Readonly<ChangeInfo["paths"]>
+		changes : ChangeInfo["changes"],
+		paths : ChangeInfo["paths"]
 	) {
 		for( let p = paths.length; p--; ) {
-			this._data.setValueAt( paths[ p ], get( changes, paths[ p ] )._value as Readonly<T> );
+			this._data.setValueAt(
+				paths[ p ],
+				get( changes, paths[ p ] )._value as T
+			);
 		}
 	}
 }

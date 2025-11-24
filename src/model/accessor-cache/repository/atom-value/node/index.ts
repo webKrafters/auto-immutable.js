@@ -74,12 +74,18 @@ class AtomNode<T extends Value>{
 	get rootAtomNode() { return this._rootAtomNode }
 	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
 	@activeNodesOnly
-	get value() {
+	get value() : Readonly<T> {
+
+		// @debug
+		console.info( 'nnnnnnnnn are we here at this node >>> >> ', this._pathToRootAtom );
+		console.info( 'nnnnnnnnn am i root atom >>>> >> ', this.isRootAtom );
+		console.info( 'nnnnnnnnn what is  my sectionn data  >>>> >> ', this._rootAtomNode._sectionData );
+
 		if( this.isRootAtom ) { return this._sectionData }
 		return get(
 			this._rootAtomNode._sectionData,
 			this._pathToRootAtom
-		)._value as Readonly<T>
+		)._value as Readonly<T>;
 	}
 	/**
 	 * applicable only to nodes containing atoms: assert via a 
@@ -92,7 +98,11 @@ class AtomNode<T extends Value>{
 	 * @param v
 	 */
 	@activeNodesOnly
-	set value( v : Readonly<T> ) {
+	set value( v : T ) {
+
+		// @debug
+		console.info( 'ggggggggg we have incoming >>> >> ', v );
+
 		const previousRootAtomValue = shallowCopy( this._rootAtomNode.value );
 		let isInit = false;
 		if( this.isRootAtom ) {
@@ -107,9 +117,9 @@ class AtomNode<T extends Value>{
 				v
 			) as Readonly<T>;
 		}
-		this._retainUnchangedDescendants( previousRootAtomValue );
+		this._retainUnchangedDescendants( previousRootAtomValue as T );
 		if( isInit ) {
-			Object.freeze( makeReadonly( this._rootAtomNode._sectionData ) );
+			makeReadonly( this._rootAtomNode._sectionData );
 			return;
 		}
 		let data = this._rootAtomNode._sectionData as T;
@@ -121,7 +131,7 @@ class AtomNode<T extends Value>{
 			data = data[ key ] as T;
 		}
 		makeReadonly( data[ this._pathToRootAtom.at( -1 ) ] );
-		this._rootAtomNode._sectionData = Object.freeze( data );
+		this._rootAtomNode._sectionData = data;
 	}
 
 	/**
@@ -195,17 +205,29 @@ class AtomNode<T extends Value>{
 	 * Not to be confused with the value setter property which must be called on an atom bearing node to assign it a new value.
 	 * 
 	 * @param {Array<string>} fullPath - the complete path tokens corresponding to the property location in the overall data object
-	 * @param {Readonly<T>} value - a change object of type Partial<typeof overall data object>
+	 * @param {T} value - a change object of type Partial<typeof overall data object>
 	 */
-	setValueAt( fullPath : Array<string>, value : Readonly<T> ) {
+	setValueAt( fullPath : Array<string>, value : T ) {
+
+		// @debug
+		console.info( 'ccccccccc we have a request to set at "' + fullPath + '" >>> >> ', value );
+
 		let node = this._findRoot();
 		if( fullPath[ 0 ] === GLOBAL_SELECTOR ) {
 			if( node.isActive ) {
+
+		// @debug
+		console.info( 'V1 hard cap >>>> ' );
+		
 				node.value = value;
 				return;
 			}
 			for( let dNodes = node._findNearestActiveDescendants(), d = dNodes.length; d--; ) {
-				dNodes[ d ].value = get( value, dNodes[ d ].fullPath )._value as Readonly<T>;
+
+		// @debug
+		console.info( 'V hard cap >>>> ' );
+		
+				dNodes[ d ].value = get( value, dNodes[ d ].fullPath )._value as T;
 			}
 			return;
 		}
@@ -219,21 +241,45 @@ class AtomNode<T extends Value>{
 		if( !activeNode ) {
 			if( node.isRoot ) { return }
 			for( let dNodes = node._findNearestActiveDescendants(), d = dNodes.length; d--; ) {
-				if( !dNodes[ d ].isRootAtom ) { continue }
-				dNodes[ d ].value = get( value, dNodes[ d ].fullPath )._value as Readonly<T>;
+				
+
+		// @debug
+		console.info( '1111 hard cap >>>> ' );
+		
+			if( !dNodes[ d ].isRootAtom ) { continue }
+				dNodes[ d ].value = get( value, dNodes[ d ].fullsPath )._value as T;
 			}
 			return;
 		}
 		const nodePathLen = activeNode.fullPath.length;
-		if( fullPath.length <= nodePathLen ) {
-			activeNode.value = get( value, fullPath )._value as Readonly<T>;
-			return;
-		}	
+		{
+			const { length } = fullPath;
+			if( length < nodePathLen ) {
+
+		// @debug
+		console.info( '111 hard cap >>>> ' );
+		
+				activeNode.value = get( value, fullPath )._value as T;
+				return;
+			}	
+			if( length === nodePathLen ) {
+
+		// @debug
+		console.info( '11 hard cap >>>> ' );
+		
+				activeNode.value = value;
+				return;
+			}
+		}
+
+		// @debug
+		console.info( '1 hard cap >>>> ' );
+
 		activeNode.value = set(
 			activeNode.value,
 			fullPath.slice( nodePathLen ),
 			get( value, fullPath )._value
-		) as Readonly<T>;
+		) as T;
 	}
 
 	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */

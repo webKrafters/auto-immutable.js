@@ -31,8 +31,8 @@ describe( '1xxxx', () => {
 	describe( 'atomize(...)', () => {
 		let cache : AccessorCache<{}>;
 		let mergeChangesSpy : jest.SpiedFunction<(
-			changes: Readonly<ChangeInfo[ "changes" ]>,
-			paths: Readonly<ChangeInfo[ "paths" ]>
+			changes: ChangeInfo[ "changes" ],
+			paths: ChangeInfo[ "paths" ]
 		) => void>;
 		beforeAll(() => {
 			cache = new AccessorCache({});
@@ -85,19 +85,11 @@ describe( '1xxxx', () => {
 		});
 		test( `defaults to obtaining ${ GLOBAL_SELECTOR } data`, () => {
 			cache.get( 'TEST_CLIENT_ID' );
-			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 2 );
-			for( let
-				pathInfoMock = getPathInfoAtSpy.mock,
-				pLen = pathInfoMock.calls.length,
-				p = 0;
-				p < pLen;
-				p++
-			) {
-				expect( pathInfoMock.calls[ p ] ).toEqual([ GLOBAL_SELECTOR ]);
-				expect( pathInfoMock.results[ p ].value ).toEqual({
-					sanitizedPathId: 1, sourcePathId: 1
-				});
-			}
+			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 1 );
+			expect( getPathInfoAtSpy.mock.calls[ 0 ] ).toEqual([ GLOBAL_SELECTOR ]);
+			expect( getPathInfoAtSpy.mock.results[ 0 ].value ).toEqual({
+				sanitizedPathId: 1, sourcePathId: 1
+			});
 		} );
 		test( `shares same accessor between clients`, () => {
 			// setting up original accessor data at ['a.v.c', 'a.c.e']
@@ -105,50 +97,33 @@ describe( '1xxxx', () => {
 			cache.get( 'REQUEST_1', ...PATHS );
 			expect( addClientSpy ).toHaveBeenCalledTimes( 1 );
 			expect( addClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_1' ]);
-			// first two calls for adding two non-existent
-			// atom paths for this accesor client.
-			// last two calls for retrieving the newly added
-			// atom paths for this accessor client.
-			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 4 );
-			const pathInfoMock = getPathInfoAtSpy.mock;
-			// adding first path to atom repo
-			expect( pathInfoMock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
-			expect( pathInfoMock.results[ 0 ].value ).toEqual({
+			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 2 );
+			expect( getPathInfoAtSpy.mock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 0 ].value ).toEqual({
 				sanitizedPathId: 1, sourcePathId: 1
 			});
-			// adding second path to atom repo
-			expect( pathInfoMock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
-			expect( pathInfoMock.results[ 1 ].value ).toEqual({
-				sanitizedPathId: 2, sourcePathId: 2
-			});
-			// retrieving first path from atom repo
-			expect( pathInfoMock.calls[ 2 ] ).toEqual([ PATHS[ 0 ] ]);
-			expect( pathInfoMock.results[ 2 ].value ).toEqual({
-				sanitizedPathId: 1, sourcePathId: 1
-			});
-			// retrieving second path from atom repo
-			expect( pathInfoMock.calls[ 3 ] ).toEqual([ PATHS[ 1 ] ]);
-			expect( pathInfoMock.results[ 3 ].value ).toEqual({
+			expect( getPathInfoAtSpy.mock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 1 ].value ).toEqual({
 				sanitizedPathId: 2, sourcePathId: 2
 			});
 			// clearing out test mocks
 			addClientSpy.mockClear();
 			getPathInfoAtSpy.mockClear();
+			
 			// reusing same accessor for a different request
+
 			cache.get( 'REQUEST_2', PATHS[ 0 ], PATHS[ 1 ] );
 			expect( addClientSpy ).toHaveBeenCalledTimes( 1 );
 			expect( addClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_2' ]);
-			// first two calls for retrieving the previously added
-			// two atom paths for this new accessor client
 			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 2 );
 			// retrieving first path from atom repo
-			expect( pathInfoMock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
-			expect( pathInfoMock.results[ 0 ].value ).toEqual({
+			expect( getPathInfoAtSpy.mock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 0 ].value ).toEqual({
 				sanitizedPathId: 1, sourcePathId: 1
 			});
 			// retrieving second path from atom repo
-			expect( pathInfoMock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
-			expect( pathInfoMock.results[ 1 ].value ).toEqual({
+			expect( getPathInfoAtSpy.mock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 1 ].value ).toEqual({
 				sanitizedPathId: 2, sourcePathId: 2
 			});
 		} );
@@ -158,51 +133,36 @@ describe( '1xxxx', () => {
 			cache.get( 'REQUEST_1', ...PATHS );
 			expect( addClientSpy ).toHaveBeenCalledTimes( 1 );
 			expect( addClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_1' ]);
-			// first two calls for adding two non-existent
-			// atom paths for this accesor client.
-			// last two calls for retrieving the newly added
-			// atom paths for this accessor client.
-			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 4 );
-			const pathInfoMock = getPathInfoAtSpy.mock;
+			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 2 );
 			// adding first path to atom repo
-			expect( pathInfoMock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
-			expect( pathInfoMock.results[ 0 ].value ).toEqual({
+			expect( getPathInfoAtSpy.mock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 0 ].value ).toEqual({
 				sanitizedPathId: 1, sourcePathId: 1
 			});
 			// adding second path to atom repo
-			expect( pathInfoMock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
-			expect( pathInfoMock.results[ 1 ].value ).toEqual({
-				sanitizedPathId: 2, sourcePathId: 2
-			});
-			// retrieving first path from atom repo
-			expect( pathInfoMock.calls[ 2 ] ).toEqual([ PATHS[ 0 ] ]);
-			expect( pathInfoMock.results[ 2 ].value ).toEqual({
-				sanitizedPathId: 1, sourcePathId: 1
-			});
-			// retrieving second path from atom repo
-			expect( pathInfoMock.calls[ 3 ] ).toEqual([ PATHS[ 1 ] ]);
-			expect( pathInfoMock.results[ 3 ].value ).toEqual({
+			expect( getPathInfoAtSpy.mock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 1 ].value ).toEqual({
 				sanitizedPathId: 2, sourcePathId: 2
 			});
 			// clearing out test mocks
 			addClientSpy.mockClear();
 			getPathInfoAtSpy.mockClear();
+
 			// reusing same accessor for a request contaning reordered access paths
+			
 			cache.get( 'REQUEST_2', PATHS[ 1 ], PATHS[ 0 ] );
 			expect( addClientSpy ).toHaveBeenCalledTimes( 1 );
 			expect( addClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_2' ]);
-			// first two calls for retrieving the previously added
-			// two atom paths for this new accessor client
 			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 2 );
-			// retrieving first path from atom repo
-			expect( pathInfoMock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
-			expect( pathInfoMock.results[ 0 ].value ).toEqual({
-				sanitizedPathId: 1, sourcePathId: 1
-			});
 			// retrieving second path from atom repo
-			expect( pathInfoMock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
-			expect( pathInfoMock.results[ 1 ].value ).toEqual({
+			expect( getPathInfoAtSpy.mock.calls[ 0 ] ).toEqual([ PATHS[ 1 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 0 ].value ).toEqual({
 				sanitizedPathId: 2, sourcePathId: 2
+			});
+			// retrieving first path from atom repo
+			expect( getPathInfoAtSpy.mock.calls[ 1 ] ).toEqual([ PATHS[ 0 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 1 ].value ).toEqual({
+				sanitizedPathId: 1, sourcePathId: 1
 			});
 		} );
 	} );

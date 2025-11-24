@@ -12,6 +12,10 @@ import type {
     ValueObjectCloneable
 } from '.';
 
+import clonedeep from '@webkrafters/clone-total';
+
+import { makeReadonly } from './utils';
+
 import setValue from './set';
 
 import { Immutable } from './main';
@@ -90,10 +94,14 @@ export class Connection<T extends Value> {
                 // disposed. (i.e. w/o calling this.disconnect(...) prior)
                 // istanbul ignore next
                 if( this.disconnected ) { return }
+                const sharedChanges = clonedeep( changes );
                 this._source.map
                     .get( this._source.key )
                     .atomize( changes, paths );
-                onComplete( changes, paths );
+                onComplete(
+                    makeReadonly( sharedChanges ),
+                    makeReadonly( paths )
+                );
             }
         );
     }

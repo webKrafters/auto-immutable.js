@@ -2,11 +2,15 @@ import {
 	UpdateStats as Stats,
 	type Changes,
 	type ChangeInfo,
-	type Listener,
 	type KeyType,
 	type TagType,
 	type Value
 } from '..';
+
+type ChangeHandler = (
+    changes : ChangeInfo["changes"],
+    paths : ChangeInfo["paths"]
+) => void;
 
 import isEqual from 'lodash.isequal';
 
@@ -17,7 +21,6 @@ import {
 	arrangePropertyPaths,
 	isDataContainer,
 	isPlainObject,
-	makeReadonly,
 	set as setProperty
 } from '../utils';
 
@@ -249,9 +252,19 @@ function setPlainObject( value, changes, rootKey, stats ) : void {
 	stats.currentPathToken.pop();
 }
 
-function setValue<T extends Value>( value : T, changes : Array<Changes<T>>, onValueChange? : Listener ) : void;
-function setValue<T extends Value>( value : T, changes : Changes<T>, onValueChange? : Listener ) : void;
-function setValue<T extends Value>( value, changes, onValueChange? ) : void {
+function setValue<T extends Value>(
+	value : T,
+	changes : Array<Changes<T>>,
+	onValueChange? : ChangeHandler
+) : void;
+function setValue<T extends Value>(
+	value : T,
+	changes : Changes<T>,
+	onValueChange? : ChangeHandler
+) : void;
+function setValue<T extends Value>(
+	value, changes, onValueChange?
+) : void {
 	const stats = new Stats();
 	if( !Array.isArray( changes ) ) {
 		set( { value }, { value: clonedeep( changes ) }, stats );
@@ -261,11 +274,8 @@ function setValue<T extends Value>( value, changes, onValueChange? ) : void {
 		}
 	}
 	if( onValueChange && stats.hasChanges ) {
-		const info = distillChanges( value, stats.changedPathTable );
-		onValueChange(
-			makeReadonly( clonedeep( info.changes ) ),
-			makeReadonly( info.paths )
-		);
+		const { changes, paths } = distillChanges( value, stats.changedPathTable );
+		onValueChange( changes, paths );
 	}
 }
 

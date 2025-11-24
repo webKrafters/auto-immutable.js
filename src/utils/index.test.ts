@@ -263,7 +263,9 @@ describe( '1xxxx', () => {
 			const expected = { a: 33, b: { a: 'T', b: [{ a: 22, b: 4, x: { q: { a: 512 } } }, 55 ] } };
 			utils.set( obj, [ 'b', 'b', 0, 'x', 'q', 'a' ], 512 );
 			expect( obj ).toStrictEqual( expected );
-			expect( Object.isFrozen( obj.b.b ) ).toBe( true );  // property remains frozen after rewrite.
+			expect( Object.isFrozen( obj.b ) ).toBe( false );
+			expect( Object.isFrozen( obj.b.b ) ).toBe( true ); // property remains frozen after rewrite.
+			expect( Object.isFrozen( obj.b.b[ 0 ] ) ).toBe( false );
 		} );
 		test( 'empty path leads the return of new replacement of object, leaving `obj` untouched', () => {
 			let obj = { a: 33, b: { a: 'T', b: [{ a: 22, b: 4 }, 55 ] } };

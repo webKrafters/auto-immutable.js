@@ -100,7 +100,7 @@ describe( '1xxxx', () => {
 					[ 'registered', 'time', 'minutes' ]
 				];
 				new AtomValue( source, pathRepo ).mergeChanges(
-					source, paths as Readonly<Array<Array<string>>>
+					source, paths as Array<Array<string>>
 				);
 				expect( setValueAtSpy ).toHaveBeenCalledTimes( paths.length );
 				const eMap = paths.reduce(( r, p ) => {

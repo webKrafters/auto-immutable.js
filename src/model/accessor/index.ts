@@ -61,14 +61,6 @@ class Accessor <T extends Value> {
 		return deleted;
 	}
 
-	private _getTokenizedPath( sourcePathId : number ) {
-		return this._pathRepo.getPathTokensAt(
-			this._pathRepo.getIdOfSanitizedPath(
-				this._pathRepo.getSanitizedPathOf( sourcePathId )
-			)
-		);
-	}
-
 	private _releaseAtoms(){
 		const atoms = this._atomRegistry;
 		const pathRepo = this._pathRepo;

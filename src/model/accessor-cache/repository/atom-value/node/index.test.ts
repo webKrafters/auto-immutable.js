@@ -93,9 +93,11 @@ describe( '1xxxx', () => {
 					const { root } = createTestAtomArtifact({} as Data);
 					const node = root.findActiveNodeAt([ 'q', 'r', 's', 't' ])!;
 					const value = getChangeData().q.r.s.t;
+					expect( Object.isFrozen( value ) ).toBe( false );
 					expect( node.value ).toBeUndefined();
 					node.value = value as Data;
 					expect( node.value ).toEqual( value );
+					expect( Object.isFrozen( node.value ) ).toBe( true );
 				} );
 				test( 'ensures that set value is readonly', () => {
 					let { root } = createTestAtomArtifact({} as Data);
@@ -106,13 +108,7 @@ describe( '1xxxx', () => {
 						i: [ 2, 5, 4, 2 ]
 					} as unknown as typeof node.value;
 					node.value = value;
-					expect( Object.isFrozen( node.value ) ).toBe( true );
-					// @ts-ignore
-					expect( Object.isFrozen( node.value.e ) ).toBe( true );
-					// @ts-ignore
-					expect( Object.isFrozen( node.value.i[ 3 ] ) ).toBe( true );
-					// @ts-ignore
-					expect( Object.isFrozen( node.value.c.j ) ).toBe( true );
+					expect( isReadonly( node.value ) ).toBe( true );
 
 					// ----- for updating existing data -----
 					
@@ -125,13 +121,7 @@ describe( '1xxxx', () => {
 						i: [ 2, 5, 4, 2 ]
 					} as unknown as typeof node.value;
 					node.value = value;
-					expect( Object.isFrozen( node.value ) ).toBe( true );
-					// @ts-ignore
-					expect( Object.isFrozen( node.value.e ) ).toBe( true );
-					// @ts-ignore
-					expect( Object.isFrozen( node.value.i[ 3 ] ) ).toBe( true );
-					// @ts-ignore
-					expect( Object.isFrozen( node.value.c.j ) ).toBe( true );
+					expect( isReadonly( node.value ) ).toBe( true );
 				} );
 				test( 'ensures that all atom values of atoms up the are readonly', () => {
 					let { root } = createTestAtomArtifact({} as Data);
@@ -139,11 +129,7 @@ describe( '1xxxx', () => {
 					let value = { message: 'this is the test....' } as unknown as typeof node.value;
 					node.value = value;
 					expect( Object.isFrozen( node.value ) ).toBe( true );
-					( function isReadonly( v : Record<string,{}> ) {
-						expect( Object.isFrozen( v ) ).toBe( true );
-						if( isString( v ) || !Object.keys( v ).length ) { return }
-						for( let k in v ) { isReadonly( v[ k ] ) }
-					} )( node.rootAtomNode.value );
+					expect( isReadonly( node.rootAtomNode.value ) ).toBe( true );
 
 					// ----- for updating existing data -----
 					
@@ -153,11 +139,7 @@ describe( '1xxxx', () => {
 					value = { message: 'this is the test....' } as unknown as typeof node.value;
 					node.value = value;
 					expect( Object.isFrozen( node.value ) ).toBe( true );
-					( function isReadonly( v : Record<string,{}> ) {
-						expect( Object.isFrozen( v ) ).toBe( true );
-						if( isString( v ) || !Object.keys( v ).length) { return }
-						for( let k in v ) { isReadonly( v[ k ] ) }
-					} )( node.rootAtomNode.value );
+					expect( isReadonly( node.rootAtomNode.value ) ).toBe( true );
 				} );
 				test( 'ensures that unaffected atoms retain their original value object references', () => {
 					const createTestUpdatePayload = ( currentState : Data ) : Data => {
@@ -178,7 +160,7 @@ describe( '1xxxx', () => {
 					let value_ty : Data;
 
 					{
-						const { root } = createTestAtomArtifact({} as Data );
+						const { root } = createTestAtomArtifact( {} as Data );
 
 						node_t = root.findActiveNodeAt([ 't' ])!;
 						node_tuvw = root.findActiveNodeAt([ 't', 'u', 'v', 'w' ])!;
@@ -204,7 +186,12 @@ describe( '1xxxx', () => {
 						expect( node_ty.value ).not.toBe( value_ty );  // affected by change
 
 						expect( node_t.value ).toEqual( newChanges.t );
-						expect( node_ty.value ).toEqual( newChanges.t.y ); 
+						expect( node_ty.value ).toEqual( newChanges.t.y );
+
+						expect( isReadonly( node_t.value ) ).toBe( true );
+						expect( isReadonly( node_tuvw.value ) ).toBe( true );
+						expect( isReadonly( node_tuz.value ) ).toBe( true);
+						expect( isReadonly( node_ty.value ) ).toBe( true );
 					}
 
 					// ----- for updating existing data -----
@@ -237,7 +224,12 @@ describe( '1xxxx', () => {
 						expect( node_ty.value ).not.toBe( value_ty );  // affected by change
 
 						expect( node_t.value ).toEqual( newChanges.t );
-						expect( node_ty.value ).toEqual( newChanges.t.y ); 
+						expect( node_ty.value ).toEqual( newChanges.t.y );
+
+						expect( isReadonly( node_t.value ) ).toBe( true );
+						expect( isReadonly( node_tuvw.value ) ).toBe( true );
+						expect( isReadonly( node_tuz.value ) ).toBe( true);
+						expect( isReadonly( node_ty.value ) ).toBe( true );
 					}
 				} );
 			} );
@@ -537,7 +529,7 @@ describe( '1xxxx', () => {
 			} );
 		} );
 		describe( 'setValueAt(...)', () => {
-			let valueSetterSpy : jest.SpyInstance<void, [Readonly<any>], any>;
+			let valueSetterSpy : jest.SpyInstance<void, [any], any>;
 			let testChanges : Data;
 			let root : AtomNode<Data>;
 			let pathRepo : PathRepository;
@@ -653,6 +645,21 @@ function createTestAtomArtifact( originData : Data ) {
 		pathRepo.getPathInfoAt( 't.y' ).sanitizedPathId
 	].forEach( id => root.insertAtomAt( id, pathRepo, originData ) );
 	return { pathRepo, root }
+}
+
+function isReadonly( v : Record<string,{}> ) {
+	if(
+		Object.isFrozen( v ) ||
+		isString( v ) ||
+		!Object.keys( v ).length
+	) {
+		return true;
+	}
+	for( let k in v ) {
+		if( !isReadonly( v[ k ] ) ) {
+			return false;
+		}
+	}
 }
 
 function getChangeData()  {

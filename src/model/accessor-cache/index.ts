@@ -52,8 +52,8 @@ class AccessorCache<T extends Value> {
 
 	/** atomizes value property changes */
 	atomize(
-		changes : Readonly<ChangeInfo["changes"]>,
-		paths : Readonly<ChangeInfo["paths"]>
+		changes : ChangeInfo["changes"],
+		paths : ChangeInfo["paths"]
 	) : void {
 		paths.length && this._valueRepo.mergeChanges( changes, paths );
 	}

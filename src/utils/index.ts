@@ -120,7 +120,7 @@ export function shallowCopy<T>( data : Readonly<T> ) : T;
 export function shallowCopy<T>( data : T ) : T;
 export function shallowCopy<T>( data ) : T {
 	if( Array.isArray( data ) ) { return [ ...data ] as T }
-	if( isPlainObject( data ) ) { return { ...data } }
+	if( isPlainObject( data ) ) { return { ...data } as T }
 	return data;
 }
 
