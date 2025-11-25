@@ -6,6 +6,8 @@ import {
 	test
 } from '@jest/globals';
 
+import isEqual from 'lodash.isequal';
+
 import type { Value } from './';
 
 import AccessorCache from './model/accessor-cache';
@@ -58,9 +60,9 @@ describe( '1xxxxr', () => {
             
             let d = connection.get( ...propertyPaths );
             passedNoneFoundTest =
-            Object.keys( d ).length === 2
-                && d[ 'b.message' ] === undefined
-                && d.valid === undefined;
+                Object.keys( d ).length === 2
+                    && d[ 'b.message' ] === undefined
+                    && d.valid === undefined;
 
             const protectedData : Data = {
                 a: 333,
@@ -79,11 +81,16 @@ describe( '1xxxxr', () => {
             updateTest.prevCacheOrigin = prevCacheOrigin;
             updateTest.cacheOrigin = cache.origin;
             updateTest.data = protectedData;
-            
-            const setCallbackCalls = setCallback.mock.calls;
-            passedUpdateCompleteNotifiedTest =
-                setCallbackCalls.length === 1 && 
-                setCallbackCalls[ 0 ][ 0 ] === protectedData;
+            {
+                const setCallbackCalls = setCallback.mock.calls;
+                passedUpdateCompleteNotifiedTest =
+                    setCallbackCalls.length === 1 && 
+                    isEqual( setCallbackCalls[ 0 ][ 0 ], protectedData ) &&
+                    isEqual(
+                        setCallbackCalls[ 0 ][ 1 ],
+                        [ [ 'a' ], [ 'b' ], [ 'valid' ] ]
+                    );
+            }
 
             const v = connection.get( ...propertyPaths );
 

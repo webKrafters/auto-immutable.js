@@ -14,17 +14,16 @@ import AtomValueRepository from './repository/atom-value';
 
 class Sorted extends Array<number> {
 	push( item : number ) {
-		if( !this.length || this.at( -1 ) < item ) {
+		if( !this.length || this.at( -1 ) <= item ) {
 			return super.push( item );
 		}
 		for( let tLen = this.length, t = 0; t < tLen; t++ ) {
-			if( this[ t ] < item ) { continue }
 			if( this[ t ] > item ) {
 				this.splice( t - 1, 0, item );
-				return tLen + 1;
+				break;
 			}
-			return tLen;
 		}
+		return this.length;
 	}
 }
 

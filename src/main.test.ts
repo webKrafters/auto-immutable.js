@@ -13,7 +13,7 @@ import { Closable, Immutable } from './main';
 // "(\w+)": --- $1:
 // Any<(\w+)> --- expect.any( $1 ) //
 // console.info( onChangeMock.mock.calls[ 0 ] );
-describe( '1xxxxw', () => {
+describe( '1xxxx', () => {
 // describe( 'Immutable class', () => {
     describe( 'identity', () => {
         let immutable : Immutable<{}>;
@@ -25,8 +25,7 @@ describe( '1xxxxw', () => {
             expect( immutable.connect() ).toBeInstanceOf( Connection );
         } );
     } );
-    test( '1xxxxqq', () => {
-    // test( 'An immutable instance can be updated by any of its connections', () => {
+    test( 'An immutable instance can be updated by any of its connections', () => {
         const path = 'test.2';
         const value = {};
 
@@ -51,11 +50,6 @@ describe( '1xxxxw', () => {
         expect( conn11.get( path )[ path ] ).toBeUndefined();
 
         conn01.set({ test: [ 43, 90, 78, 22 ] });
-        
-        // @debug
-        // console.info( '>>>>>>> path: ' + path + ' >>>>>>> ', conn00.get( path ) );
-        console.info( '>>>>>>> path: ' + path + ' >>>>>>> ', conn00.get( '@@GLOBAL' ) );
-
 
         expect( conn00.get( path )[ path ] ).toBe( 78 );
         expect( conn01.get( path )[ path ] ).toBe( 78 );

@@ -17,7 +17,7 @@ type Data = ReturnType<typeof getChangeData>;
 // "(\w+)": --- $1:
 // Any<(\w+)> --- expect.any( $1 ) //
 // console.info( onChangeMock.mock.calls[ 0 ] );
-describe( '1xxxx', () => {
+describe( '1xxxxd', () => {
 // describe( 'AtomNode class', () => {
 	describe( 'root node', () => {
 		let rootNode : AtomNode<Data>;
@@ -545,8 +545,8 @@ describe( '1xxxx', () => {
 				root = artifact.root;
 				pathRepo = artifact.pathRepo;
 				testChanges = getChangeData();
-			} )
-			afterAll(() => { valueSetterSpy.mockRestore() })
+			} );
+			afterAll(() => { valueSetterSpy.mockRestore() });
 			test( 'sets atom at global selector wwhen available', () => {
 				expect( root.key ).toBe( GLOBAL_SELECTOR );
 				expect( root.isActive ).toBe( false );
@@ -574,7 +574,7 @@ describe( '1xxxx', () => {
 				expect( valueSetterSpy.mock.calls[ 4 ][ 0 ] ).toEqual( testChanges.a.e.f.g.h );
 				expect( valueSetterSpy.mock.calls[ 5 ][ 0 ] ).toEqual( testChanges.a.b );
 			} );
-			test( 'does not apply changes not occurring in paths matching or existing the atom value object', () => {
+			test( 'does not apply changes not occurring along the paths containing atom value object(s)', () => {
 				root.setValueAt( [ 'w', 'x', 'y', 'z' ], testChanges );
 				expect( valueSetterSpy ).not.toHaveBeenCalled();
 			} );
@@ -593,7 +593,10 @@ describe( '1xxxx', () => {
 					...testChanges.a.b.c.d.e,
 					w: { x: { y: { z: {} } } }
 				} as typeof testChanges.a.b.c.d.e;
-				root.setValueAt( [ 'a', 'b', 'c', 'd', 'e' ], testChanges );
+				root.setValueAt(
+					[ 'a', 'b', 'c', 'd', 'e' ],
+					testChanges.a.b.c.d.e as unknown as Data
+				);
 				// called 1x directly on the atom bearing node (this for this change is located at path 'a.b.c.d.e')
 				expect( valueSetterSpy ).toHaveBeenCalledTimes( 1 );
 				expect( valueSetterSpy ).toHaveBeenCalledWith( testChanges.a.b.c.d.e );
@@ -618,7 +621,7 @@ describe( '1xxxx', () => {
 						z: {}
 					}
 				} as typeof testChanges.q.r;
-				root.setValueAt( [ 'q', 'r' ], testChanges );
+				root.setValueAt( [ 'q', 'r' ], testChanges.q.r as unknown as Data );
 				// called 2x for root atoms occurring under the 'q.r' path; namely nodes at paths 'q.r.s.a' and 'q.r.s.t'
 				expect( valueSetterSpy ).toHaveBeenCalledTimes( 2 );
 				expect( valueSetterSpy.mock.calls[ 0 ][ 0 ] ).toEqual( testChanges.q.r.s.t );

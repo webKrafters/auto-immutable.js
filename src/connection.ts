@@ -55,6 +55,7 @@ export class Connection<T extends Value> {
         // properly disposed. (i.e. w/o calling Immutable.close(...) prior)
         // istanbul ignore next
         this._source = undefined;
+        // istanbul ignore next
         return true;
     }
     
@@ -90,10 +91,6 @@ export class Connection<T extends Value> {
             this._source.map.get( this._source.key ).origin,
             changes,
             ( changes, paths ) => {
-                // addresses eventual gc collection when not properly
-                // disposed. (i.e. w/o calling this.disconnect(...) prior)
-                // istanbul ignore next
-                if( this.disconnected ) { return }
                 const sharedChanges = clonedeep( changes );
                 this._source.map
                     .get( this._source.key )

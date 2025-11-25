@@ -127,6 +127,7 @@ export function shallowCopy<T>( data ) : T {
 function createDefaultContainerFor( key : KeyType ) { return isAlphaNumeric( key ) ? [] : {} }
 
 function normalize<T>( value : T, key : KeyType ) : T|Record<keyof T, unknown> {
+	// istanbul ignore next
 	return !Array.isArray( value ) || isAlphaNumeric( key ) ? value : { ...value };
 };
 

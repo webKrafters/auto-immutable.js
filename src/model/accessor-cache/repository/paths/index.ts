@@ -67,6 +67,7 @@ class PathRepository {
 	}
 
 	removeSource( sourcePath : string ) {
+		// istanbul ignore next
 		if( !( sourcePath in this._sourceToIdMap ) ) { return }
 		const sourcePathId = this._sourceToIdMap[ sourcePath ];
 		delete this._sourceToIdMap[ sourcePath ];

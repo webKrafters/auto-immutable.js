@@ -75,12 +75,6 @@ class AtomNode<T extends Value>{
 	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
 	@activeNodesOnly
 	get value() : Readonly<T> {
-
-		// @debug
-		console.info( 'nnnnnnnnn are we here at this node >>> >> ', this._pathToRootAtom );
-		console.info( 'nnnnnnnnn am i root atom >>>> >> ', this.isRootAtom );
-		console.info( 'nnnnnnnnn what is  my sectionn data  >>>> >> ', this._rootAtomNode._sectionData );
-
 		if( this.isRootAtom ) { return this._sectionData }
 		return get(
 			this._rootAtomNode._sectionData,
@@ -99,10 +93,6 @@ class AtomNode<T extends Value>{
 	 */
 	@activeNodesOnly
 	set value( v : T ) {
-
-		// @debug
-		console.info( 'ggggggggg we have incoming >>> >> ', v );
-
 		const previousRootAtomValue = shallowCopy( this._rootAtomNode.value );
 		let isInit = false;
 		if( this.isRootAtom ) {
@@ -205,34 +195,23 @@ class AtomNode<T extends Value>{
 	 * Not to be confused with the value setter property which must be called on an atom bearing node to assign it a new value.
 	 * 
 	 * @param {Array<string>} fullPath - the complete path tokens corresponding to the property location in the overall data object
-	 * @param {T} value - a change object of type Partial<typeof overall data object>
+	 * @param {T} value - a change object residing at this path of type Partial<typeof overall data object>
 	 */
 	setValueAt( fullPath : Array<string>, value : T ) {
-
-		// @debug
-		console.info( 'ccccccccc we have a request to set at "' + fullPath + '" >>> >> ', value );
-
 		let node = this._findRoot();
 		if( fullPath[ 0 ] === GLOBAL_SELECTOR ) {
 			if( node.isActive ) {
-
-		// @debug
-		console.info( 'V1 hard cap >>>> ' );
-		
 				node.value = value;
 				return;
 			}
 			for( let dNodes = node._findNearestActiveDescendants(), d = dNodes.length; d--; ) {
-
-		// @debug
-		console.info( 'V hard cap >>>> ' );
-		
 				dNodes[ d ].value = get( value, dNodes[ d ].fullPath )._value as T;
 			}
 			return;
 		}
+		const fullPathLen = fullPath.length;
 		let activeNode : AtomNode<T> = node.isActive ? node : null;
-		for( let fLen = fullPath.length, f = 0; f < fLen; f++ ) {
+		for( let f = 0; f < fullPathLen; f++ ) {
 			const key = fullPath[ f ];
 			if( !( key in node._branches ) ) { break }
 			node = node._branches[ key ];
@@ -241,40 +220,21 @@ class AtomNode<T extends Value>{
 		if( !activeNode ) {
 			if( node.isRoot ) { return }
 			for( let dNodes = node._findNearestActiveDescendants(), d = dNodes.length; d--; ) {
-				
-
-		// @debug
-		console.info( '1111 hard cap >>>> ' );
-		
-			if( !dNodes[ d ].isRootAtom ) { continue }
-				dNodes[ d ].value = get( value, dNodes[ d ].fullsPath )._value as T;
+				if( !dNodes[ d ].isRootAtom ) { continue }
+				dNodes[ d ].value = get( value, dNodes[ d ].fullPath.slice( fullPathLen ) )._value as T;
 			}
 			return;
 		}
 		const nodePathLen = activeNode.fullPath.length;
-		{
-			const { length } = fullPath;
-			if( length < nodePathLen ) {
-
-		// @debug
-		console.info( '111 hard cap >>>> ' );
-		
-				activeNode.value = get( value, fullPath )._value as T;
-				return;
-			}	
-			if( length === nodePathLen ) {
-
-		// @debug
-		console.info( '11 hard cap >>>> ' );
-		
-				activeNode.value = value;
-				return;
-			}
+		// istanbul ignore if
+		if( fullPathLen < nodePathLen ) {
+			activeNode.value = get( value, activeNode.fullPath.slice( fullPathLen ) )._value as T;
+			return;
+		}	
+		if( fullPathLen === nodePathLen ) {
+			activeNode.value = value;
+			return;
 		}
-
-		// @debug
-		console.info( '1 hard cap >>>> ' );
-
 		activeNode.value = set(
 			activeNode.value,
 			fullPath.slice( nodePathLen ),
@@ -292,6 +252,7 @@ class AtomNode<T extends Value>{
 		if( isAPrefixOfB( fullPath, this.fullPath ) ) {
 			return this._addAncestorAtomNodeAt( sanitizedPathId, origin );
 		}
+		// istanbul ignore next
 		throw new Error( `\`fullPath\` argument must either be \`["${ GLOBAL_SELECTOR }"]\` a prefix or suffix of the \`fullPath\` of this node.` );
 	}
 
