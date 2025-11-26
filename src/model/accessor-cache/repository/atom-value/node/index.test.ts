@@ -26,6 +26,12 @@ describe( '1xxxxd', () => {
 		test( 'root node has a default global path  and key', () => {
 			const globalPathTokens = [ GLOBAL_SELECTOR ];
 			expect( rootNode.key ).toBe( globalPathTokens[ 0 ] );
+			const pathRepo = new PathRepository();
+			rootNode.insertAtomAt(
+				pathRepo.getPathInfoAt( GLOBAL_SELECTOR ).sanitizedPathId,
+				pathRepo,
+				{} as Data
+			);
 			expect( rootNode.fullPath ).toEqual( globalPathTokens );
 		} );
 	} );
@@ -381,6 +387,30 @@ describe( '1xxxxd', () => {
 					expect( _a.activeRoot.isActive ).toBe( true );
 					expect( _a.activeRoot.findActiveNodeAt( pathTokens ) ).toBe( _a.activeRoot );
 				} );
+				describe( '', () => {
+					let _a = getArtifact();
+					test( 'converts between inactive node along a path between two active nodes', () => {
+						let newAtomPath = _a.activePathTokens.slice( 0, 2 );
+						expect( _a.activeNode.isRootAtom ).toBe( true );
+						_a.activeRoot.insertAtomAt( // creating new atom root above _a.activeNode
+							_a.activePathRepo.getPathInfoAt( newAtomPath.join( '.' ) ).sanitizedPathId,
+							_a.activePathRepo,
+							{}
+						);
+						expect( _a.activeNode.isRootAtom ).toBe( false );
+						expect( _a.activeRoot.findActiveNodeAt( newAtomPath )?.isRootAtom ).toBe( true );
+						// activate a connective node lying between the new root atom and _a.activeNode
+						_a.activeRoot.insertAtomAt(
+							_a.activePathRepo.getPathInfoAt( 
+								_a.activePathTokens
+									.slice( 0, 5 )
+									.join( '.' )
+								).sanitizedPathId,
+							_a.activePathRepo,
+							{}
+						);
+					} );
+				} );
 			} );
 		} );
 		describe( 'remove(...)', () => {
@@ -469,7 +499,7 @@ describe( '1xxxxd', () => {
 				expect( a.activeNode.findActiveNodeAt( leafPathTokens ) ).toBeNull();
 				expect( ancestorNode.isLeaf ).toBe( true );
 			} );
-			test( 'removing an active ancestor converts it to an inactive connective node', () => {
+			test( 'converts an active ancestor node to an inactive connective node', () => {
 				const ancestorPathTokens = [ 'c', 'm', 'k', 'b' ];
 				const leafPathTokens = [ ...ancestorPathTokens, 'n', 'm', 'k', 'j' ];
 				const {
@@ -493,6 +523,98 @@ describe( '1xxxxd', () => {
 					removedNode = removedNode.branches[ key ];
 				}
 				expect( removedNode.isActive ).toBe( false );
+			} );
+			describe( '', () => {
+				const a = getArtifact();
+				test( '1xxxxc', () => {
+				// test( 'simply converts a middle non-root/non-leaf atom node to an inactive connective node', () => {
+					a.activeRoot.insertAtomAt(
+						a.activePathRepo.getPathInfoAt([
+							...a.activePathTokens, 'c', 'm', 'k', 'b'
+						].join( '.' )).sanitizedPathId,
+						a.activePathRepo,
+						{}
+					);
+					a.activeRoot.insertAtomAt(
+						a.activePathRepo.getPathInfoAt( GLOBAL_SELECTOR ).sanitizedPathId,
+						a.activePathRepo,
+						{}
+					);
+					expect( a.activeNode.isActive ).toBe( true );
+					expect( a.activeNode.fullPath ).toEqual( a.activePathTokens );
+					expect( a.activeNode.isLeaf ).toEqual( false );
+					a.activeNode.remove();
+					const deActivatedNode = a.activeRoot.findActiveNodeAt( a.activePathTokens )!;
+					expect( deActivatedNode ).not.toBe( a.activeNode );
+
+					// @debug
+					console.info( ' >< '.repeat( 33 ) );
+					console.info( deActivatedNode );
+
+					expect( deActivatedNode.isActive ).toBe( false );
+					expect(() => deActivatedNode.fullPath ).toThrow();
+					expect( deActivatedNode.isLeaf ).toEqual( false );
+					
+				} );
+			} );
+			describe( '', () => {
+				const a = getArtifact();
+				test( 'adding and removing ancestor root atom node converts its nearest active descendans to root atom node', () => {
+					expect( a.activeNode.isRootAtom ).toBe( true );
+					// -- new superseding root atom node --
+					const rootAtomPathTokens = [ 'a', 'b', 'c' ]
+					let pathTokens = [ ...rootAtomPathTokens ];
+					a.activeRoot.insertAtomAt(
+						a.activePathRepo.getPathInfoAt( pathTokens.join( '.' ) ).sanitizedPathId,
+						a.activePathRepo,
+						{}
+					);
+					const newRootAtomNode = a.activeRoot.findActiveNodeAt( pathTokens )!;
+					expect( newRootAtomNode.isRootAtom ).toBe( true );
+					// -- converts old root atom node at ` a.activeNode` to new desc node 1 --
+					expect( a.activeNode.isRootAtom ).toBe( false );
+					// -- new desc node 2 --
+					pathTokens = [ ...rootAtomPathTokens, 'c', 'm', 'k', 'b' ];
+					a.activeRoot.insertAtomAt(
+						a.activePathRepo.getPathInfoAt( pathTokens.join( '.' ) ).sanitizedPathId,
+						a.activePathRepo,
+						{}
+					);
+					const descAtomNode1 = a.activeRoot.findActiveNodeAt( pathTokens )!;
+					expect( descAtomNode1.isRootAtom ).toBe( false );
+					// -- new desc node 3 --
+					pathTokens = [ ...rootAtomPathTokens, 'p', 'r', 's', 't' ];
+					a.activeRoot.insertAtomAt(
+						a.activePathRepo.getPathInfoAt( pathTokens.join( '.' ) ).sanitizedPathId,
+						a.activePathRepo,
+						{}
+					);
+					const descAtomNode2 = a.activeRoot.findActiveNodeAt( pathTokens )!;
+					expect( descAtomNode2.isRootAtom ).toBe( false );
+					// -- new desc node 4 --
+					pathTokens = [ ...rootAtomPathTokens, 'n', 'm', 'k', 'j' ];
+					a.activeRoot.insertAtomAt(
+						a.activePathRepo.getPathInfoAt( pathTokens.join( '.' ) ).sanitizedPathId,
+						a.activePathRepo,
+						{}
+					);
+					const descAtomNode3 = a.activeRoot.findActiveNodeAt( pathTokens )!;
+					expect( descAtomNode3.isRootAtom ).toBe( false );
+					// add desc. to descAtomNode3
+					pathTokens = [ ...pathTokens, 'w', 'x', 'y', 'z' ];
+					a.activeRoot.insertAtomAt(
+						a.activePathRepo.getPathInfoAt( pathTokens.join( '.' ) ).sanitizedPathId,
+						a.activePathRepo,
+						{}
+					);// -- removing top shared root Atom converts immediate descendants to root atom nodes
+					newRootAtomNode.remove();
+					expect( a.activeNode.isRootAtom ).toBe( true ); // is now a root atom node
+					expect( descAtomNode1.isRootAtom ).toBe( true ); // is now a root atom node
+					expect( descAtomNode2.isRootAtom ).toBe( true ); // is now a root atom node
+					expect( descAtomNode3.isRootAtom ).toBe( true ); // is now a root atom node
+
+					expect( a.activeRoot.findActiveNodeAt( pathTokens )!.rootAtomNode ).toBe( descAtomNode3 );
+				} );
 			} );
 		} );
 		describe( 'removeAccessor(...)', () => {

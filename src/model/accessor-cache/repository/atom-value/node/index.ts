@@ -62,6 +62,7 @@ class AtomNode<T extends Value>{
 	}
 
 	get branches() { return this._branches }
+	@activeNodesOnly
 	get fullPath() {
 		if( this._key === GLOBAL_SELECTOR ) { return [ this._key ] }
 		return this._fullPathRepo.getPathTokensAt( this._fullPathId );
@@ -69,8 +70,10 @@ class AtomNode<T extends Value>{
 	get isActive() { return !!this._atom }
 	get isLeaf() { return !Object.keys( this._branches ).length }
 	get isRoot() { return !this._head }
+	@activeNodesOnly
 	get isRootAtom() { return  this === this._rootAtomNode }
 	get key() { return this._key }
+	@activeNodesOnly
 	get rootAtomNode() { return this._rootAtomNode }
 	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
 	@activeNodesOnly
@@ -156,7 +159,7 @@ class AtomNode<T extends Value>{
 			if( key in node._branches ) {
 				node = node._branches[ key ];
 				if( !node.isActive ) { continue }
-				return node._addAtomNodeAt( sanitizedPathId, origin );
+				return node._addActiveDescendantNodeAt( sanitizedPathId );
 			}
 			node._branches[ key ] = new AtomNode<T>( key, node );
 			node = node._branches[ key ];
@@ -186,7 +189,7 @@ class AtomNode<T extends Value>{
 		head._branches[ key ]._branches = this._branches;
 		if( !this.isRootAtom ) { return }
 		for( let descNodes = head._branches[ key ]._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
-			descNodes[ d ]._convertToRootAtomNode();
+			descNodes[ d ]._convertToRootAtomNodeFrom( this );
 		}
 	}
 	
@@ -210,6 +213,7 @@ class AtomNode<T extends Value>{
 			return;
 		}
 		const fullPathLen = fullPath.length;
+		// istanbul ignore next
 		let activeNode : AtomNode<T> = node.isActive ? node : null;
 		for( let f = 0; f < fullPathLen; f++ ) {
 			const key = fullPath[ f ];
@@ -220,17 +224,13 @@ class AtomNode<T extends Value>{
 		if( !activeNode ) {
 			if( node.isRoot ) { return }
 			for( let dNodes = node._findNearestActiveDescendants(), d = dNodes.length; d--; ) {
+				// istanbul ignore next
 				if( !dNodes[ d ].isRootAtom ) { continue }
 				dNodes[ d ].value = get( value, dNodes[ d ].fullPath.slice( fullPathLen ) )._value as T;
 			}
 			return;
 		}
 		const nodePathLen = activeNode.fullPath.length;
-		// istanbul ignore if
-		if( fullPathLen < nodePathLen ) {
-			activeNode.value = get( value, activeNode.fullPath.slice( fullPathLen ) )._value as T;
-			return;
-		}	
 		if( fullPathLen === nodePathLen ) {
 			activeNode.value = value;
 			return;
@@ -240,57 +240,6 @@ class AtomNode<T extends Value>{
 			fullPath.slice( nodePathLen ),
 			get( value, fullPath )._value
 		) as T;
-	}
-
-	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
-	@activeNodesOnly
-	private _addAtomNodeAt( sanitizedPathId : number, origin : T ) {
-		const fullPath = this._fullPathRepo.getPathTokensAt( sanitizedPathId );
-		if( isAPrefixOfB( this.fullPath, fullPath ) ) {
-			return this._addActiveDescendantNodeAt( sanitizedPathId );
-		}
-		if( isAPrefixOfB( fullPath, this.fullPath ) ) {
-			return this._addAncestorAtomNodeAt( sanitizedPathId, origin );
-		}
-		// istanbul ignore next
-		throw new Error( `\`fullPath\` argument must either be \`["${ GLOBAL_SELECTOR }"]\` a prefix or suffix of the \`fullPath\` of this node.` );
-	}
-
-	/**
-	 * applicable only to nodes containing atoms: assert
-	 * via a `this.isActive` check.
-	 * 
-	 * @param {number} sanitizedPathId - must be an id to a path in pathRepo which is prefix of and shorter than `this.fullPath`
-	 */
-	@activeNodesOnly
-	private _addAncestorAtomNodeAt( sanitizedPathId : number, origin : T ) : void {
-		if( !this.isRootAtom ) {
-			return this.rootAtomNode._addAncestorAtomNodeAt( sanitizedPathId, origin );
-		}
-		const fullPath = this._fullPathRepo.getPathTokensAt( sanitizedPathId );
-		let isNewRootAtom = isAPrefixOfB( fullPath, this.fullPath );
-		if( isNewRootAtom && fullPath.length === this.fullPath.length ) { return }
-		const pathInfo = {
-			dottedPathId: sanitizedPathId,
-			pathRepo: this._fullPathRepo
-		};
-		let node = this._findNodeAt( fullPath );
-		const key = fullPath.at( -1 );
-		if( !isNewRootAtom ) {
-			node._head._branches[ key ] = new AtomNode<T>(
-				key, node._head, pathInfo, this.rootAtomNode
-			);
-			node._head._branches[ key ]._branches = node._branches;
-			return;
-		}
-		node._head._branches[ key ] = new AtomNode<T>(
-			key, node._head, pathInfo, undefined, origin
-		);
-		node._head._branches[ key ]._branches = node._branches;
-		node = node._head._branches[ key ];
-		for( let descNodes = this._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
-			descNodes[ d ]._adjustToNewAtomNode( node );
-		}
 	}
 
 	/**
@@ -360,21 +309,20 @@ class AtomNode<T extends Value>{
 		this._rootAtomNode = this;
 	}
 
-	private _adjustToNewAtomNode( rootAtomNode : AtomNode<T> ) {
-		this._rootAtomNode = rootAtomNode;
-		this._pathToRootAtom = this.fullPath.slice( rootAtomNode.fullPath.length );
-		if( !this._sectionData ) { return }
-		rootAtomNode._sectionData = set(
-			rootAtomNode._sectionData,
-			this._pathToRootAtom,
-			this._sectionData
-		) as Readonly<T>;
-		this._sectionData = null;
+	private _adjustToNewAtomNode( newRootAtomNode : AtomNode<T> ) {
+		this._rootAtomNode = newRootAtomNode;
+		this._pathToRootAtom = this.fullPath.slice( newRootAtomNode.fullPath.length );
+		if( this.isLeaf ) { return }
+		for( let descNodes = this._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
+			descNodes[ d ]._adjustToNewAtomNode( this.rootAtomNode );
+		}
 	}
 
-	private _convertToRootAtomNode() {
+	private _convertToRootAtomNodeFrom( oldRootAtomNode : AtomNode<T>  ) {
+		this._sectionData = get( oldRootAtomNode._sectionData, this._pathToRootAtom )._value as T;
 		this._rootAtomNode = this;
 		this._pathToRootAtom = [];
+		if( this.isLeaf ) { return }
 		for( let descNodes = this._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
 			descNodes[ d ]._adjustToNewAtomNode( this );
 		}	
@@ -386,17 +334,6 @@ class AtomNode<T extends Value>{
 		let head = this._head;
 		delete head._branches[ this._key ];
 		!head.isActive && head.isLeaf && head._destroy();
-	}
-
-	/** produces the closest `atomNode` ancestor to this node. */
-	private _findClosestActiveAncestor() : AtomNode<T> {
-		if( this.isRoot ){ return null }
-		let node : AtomNode<T> = this;
-		do{
-			node = node._head;
-			if( node.isActive ) { return node }
-		} while( !node.isRoot )	;
-		return null;
 	}
 
 	/**
@@ -445,8 +382,7 @@ class AtomNode<T extends Value>{
 	}
 
 	private _retainUnchangedDescendants( previousRootAtomValue : T ) {
-		const atomNode = !this.isActive ? this._findClosestActiveAncestor() : this;
-		if( !atomNode ) { return }
+		const atomNode = this;
 		const _sectionData = !atomNode.isRootAtom
 			? atomNode._rootAtomNode._sectionData
 			: atomNode._sectionData;
@@ -456,9 +392,11 @@ class AtomNode<T extends Value>{
 			propPath : Array<string>
 		) {
 			if( isString( propValue ) ) { return propValue === prevValue }
+			// istanbul ignore next
 			const keys = Object.keys( propValue ?? 0 );
 			const len = keys.length;
 			const pLen = Object.keys( prevValue ?? 0 ).length;
+			// istanbul ignore if
 			if( !len ) {
 				return pLen
 					? false
