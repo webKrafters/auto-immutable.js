@@ -53,7 +53,6 @@
     "@webkrafters/clone-total": ">= 1.0.1",
     "@webkrafters/get-property": ">= 1.2.1",
     "@webkrafters/path-dotize": ">= 0.0.2",
-    "lodash.clonedeepwith": ">= 0.1.0",
     "lodash.isempty": ">= 0.1.0",
     "lodash.isequal": ">= 0.1.0",
     "lodash.isplainobject": ">= 1.0.0"
