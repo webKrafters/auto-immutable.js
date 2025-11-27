@@ -31,12 +31,7 @@ import createSourceData from '../test-artifacts/data/create-data-obj';
 
 type Value = Partial<SourceData>
 
-/* @debug */
-// "(\w+)": --- $1:
-// Any<(\w+)> --- expect.any( $1 ) //
-// console.info( onChangeMock.mock.calls[ 0 ] );
-describe( '1xxxx', () => {
-// describe( 'setValue(...)', () => {
+describe( 'setValue(...)', () => {
 	const value : Value = createSourceData();
 	describe( 'basics', () => {
 		let newAge : number;

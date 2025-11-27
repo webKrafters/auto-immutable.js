@@ -9,12 +9,7 @@ import '../../../../test-artifacts/suppress-render-compat';
 
 import PathRepository, { PathIdInfo } from '.';
 
-/* @debug */
-// "(\w+)": --- $1:
-// Any<(\w+)> --- expect.any( $1 ) //
-// console.info( onChangeMock.mock.calls[ 0 ] );
-describe( '1xxxx', () => {
-// describe( 'PathRepository class', () => {
+describe( 'PathRepository class', () => {
 	const SOURCE_PATH = 'a.c.e.a.r[9][0].s.g[33]';
 	let pathRepo : PathRepository;
 	let pathInfo : PathIdInfo;

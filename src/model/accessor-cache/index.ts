@@ -81,11 +81,9 @@ class AccessorCache<T extends Value> {
 		!accessor.hasClient( clientId ) &&
 		accessor.addClient( clientId );
 		const { value } = accessor;
-		for( const k in value ) {
-			value[ info[ k ] ] = value[ k ];
-			delete value[ k ];
-		}
-		return value;
+		const res = {} as typeof accessor.value;
+		for( const k in value ) { res[ info[ k ] ] = value[ k ] }
+		return res;
 	}
 
 	/**

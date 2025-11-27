@@ -6,12 +6,7 @@ import {
 
 import Atom from '.';
 
-/* @debug */
-// "(\w+)": --- $1:
-// Any<(\w+)> --- expect.any( $1 ) //
-// console.info( onChangeMock.mock.calls[ 0 ] );
-describe( '1xxxx', () => {
-// describe( 'Atom class', () => {
+describe( 'Atom class', () => {
 	describe( 'connect(...)', () => {
 		test( 'adds new connections and returns number of connections remaining', () => {
 			const atom = new Atom();

@@ -20,12 +20,7 @@ type Data = Value & {
     valid: boolean
 };
 
-/* @debug */
-// "(\w+)": --- $1:
-// Any<(\w+)> --- expect.any( $1 ) //
-// console.info( onChangeMock.mock.calls[ 0 ] );
-describe( '1xxxxr', () => {
-// sdescribe( 'Connection class', () => { 
+describe( 'Connection class', () => { 
     const setup = () => {
         const cache = new AccessorCache({});
         const imDeps = require( './main' ).deps;

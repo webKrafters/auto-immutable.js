@@ -9,12 +9,7 @@ import {
 import { Connection } from './connection';
 import { Closable, Immutable } from './main';
 
-/* @debug */
-// "(\w+)": --- $1:
-// Any<(\w+)> --- expect.any( $1 ) //
-// console.info( onChangeMock.mock.calls[ 0 ] );
-describe( '1xxxx', () => {
-// describe( 'Immutable class', () => {
+describe( 'Immutable class', () => {
     describe( 'identity', () => {
         let immutable : Immutable<{}>;
         beforeAll(() => { immutable = new Immutable({}) });

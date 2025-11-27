@@ -56,7 +56,7 @@ class AtomNode<T extends Value>{
 	) {
 		this._head = head;
 		this._key = key;
-		pathSource && this._activateNodeWith(
+		pathSource && this._activateWith(
 			pathSource, origin, rootAtomNode
 		);
 	}
@@ -148,7 +148,7 @@ class AtomNode<T extends Value>{
 		const fullPath = pathRepo.getPathTokensAt( sanitizedPathId );
 		let node = this._findRoot();
 		if( fullPath[ 0 ] === GLOBAL_SELECTOR ) {
-			return node._activateNodeWith({
+			return node._activateWith({
 				dottedPathId: sanitizedPathId,
 				pathRepo
 			}, origin );
@@ -167,7 +167,7 @@ class AtomNode<T extends Value>{
 		key = fullPath.at( -1 );
 		const pathSource = { dottedPathId: sanitizedPathId, pathRepo };
 		if( key in node._branches ) {
-			return node._branches[ key ]._activateNodeWith( pathSource, origin );
+			return node._branches[ key ]._activateWith( pathSource, origin );
 		}
 		node._branches[ key ] = new AtomNode<T>( key, node, pathSource, undefined, origin );
 	}
@@ -182,15 +182,7 @@ class AtomNode<T extends Value>{
 	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
 	@activeNodesOnly
 	remove() {
-		if( this.isLeaf ) { return this._destroy() }
-		const key = this.fullPath.at( -1 );
-		let head = this._head;
-		head._branches[ key ] = new AtomNode( key, head );
-		head._branches[ key ]._branches = this._branches;
-		if( !this.isRootAtom ) { return }
-		for( let descNodes = head._branches[ key ]._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
-			descNodes[ d ]._convertToRootAtomNodeFrom( this );
-		}
+		this.isLeaf ? this._destroy() : this._deactivate();
 	}
 	
 	/**
@@ -241,6 +233,35 @@ class AtomNode<T extends Value>{
 			get( value, fullPath )._value
 		) as T;
 	}
+	
+	/**
+	 * Activates existing inactive nodes. Inactive nodes are
+	 * simply connective nodes linking active atom nodes.
+	 * 
+	 * @param {FullPathSource} pathSource
+	 * @param {T} origin - not needed if creating active descendant atom node.
+	 * @param {AtomNode<T>} [rootAtomNode] - leave empty if creating active descendant atom node.
+	 * @template T
+	 */
+	private _activateWith(
+		{ dottedPathId, pathRepo } : FullPathSource,
+		origin : T,
+		rootAtomNode : AtomNode<T> = null
+	) {
+		this._atom = new Atom();
+		this._fullPathRepo = pathRepo;
+		this._fullPathId = dottedPathId;
+		if( !!rootAtomNode ) { // for creating an active descedant atom node
+			this._rootAtomNode = rootAtomNode;
+			this._pathToRootAtom = this.fullPath.slice( rootAtomNode.fullPath.length );
+			return;
+		}
+		this._sectionData = cloneDeep( get( origin, this.fullPath )._value );
+		for( let descNodes = this._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
+			descNodes[ d ]._adjustToNewAtomNode( this );
+		}
+		this._rootAtomNode = this;
+	}
 
 	/**
 	 * applicable only to nodes containing atoms: assert
@@ -274,39 +295,10 @@ class AtomNode<T extends Value>{
 			return;
 		}
 		!node._branches[ key ].isActive &&
-		node._branches[ key ]._activateNodeWith({ 
+		node._branches[ key ]._activateWith({ 
 			dottedPathId: sanitizedPathId,
 			pathRepo: this._fullPathRepo
 		}, undefined, this._rootAtomNode );
-	}
-	
-	/**
-	 * Activates existing inactive nodes. Inactive nodes are
-	 * simply connective nodes linking active atom nodes.
-	 * 
-	 * @param {FullPathSource} pathSource
-	 * @param {T} origin - not needed if creating active descendant atom node.
-	 * @param {AtomNode<T>} [rootAtomNode] - leave empty if creating active descendant atom node.
-	 * @template T
-	 */
-	private _activateNodeWith(
-		{ dottedPathId, pathRepo } : FullPathSource,
-		origin : T,
-		rootAtomNode : AtomNode<T> = null
-	) {
-		this._atom = new Atom();
-		this._fullPathRepo = pathRepo;
-		this._fullPathId = dottedPathId;
-		if( !!rootAtomNode ) { // for creating an active descedant atom node
-			this._rootAtomNode = rootAtomNode;
-			this._pathToRootAtom = this.fullPath.slice( rootAtomNode.fullPath.length );
-			return;
-		}
-		this._sectionData = cloneDeep( get( origin, this.fullPath )._value );
-		for( let descNodes = this._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
-			descNodes[ d ]._adjustToNewAtomNode( this );
-		}
-		this._rootAtomNode = this;
 	}
 
 	private _adjustToNewAtomNode( newRootAtomNode : AtomNode<T> ) {
@@ -328,8 +320,23 @@ class AtomNode<T extends Value>{
 		}	
 	}
 
+	private _deactivate() {
+		if( this.isRootAtom ) {
+			for( let descNodes = this._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
+				descNodes[ d ]._convertToRootAtomNodeFrom( this );
+			}
+		}
+		this._atom = undefined;
+		this._fullPathId = undefined;
+		this._fullPathRepo = undefined;
+		this._pathToRootAtom = [];
+		this._rootAtomNode = undefined;
+		this._sectionData = undefined;
+	}
+
 	/** handling removal of node. - discarding all dangling leaf nodes leading up to it. */
 	private _destroy() {
+		// istanbul ignore next
 		if( this.isRoot ) { return }
 		let head = this._head;
 		delete head._branches[ this._key ];

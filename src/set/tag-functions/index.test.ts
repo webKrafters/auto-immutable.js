@@ -28,12 +28,7 @@ import { UpdateStats as Stats } from '../../';
 
 import createSourceData from '../../test-artifacts/data/create-data-obj';
 
-/* @debug */
-// "(\w+)": --- $1:
-// Any<(\w+)> --- expect.any( $1 ) //
-// console.info( onChangeMock.mock.calls[ 0 ] );
-describe( '1xxxx', () => {
-// describe( 'tag-functions(...)', () => {
+describe( 'tag-functions(...)', () => {
 
 	let state : SourceData;
 	let statsStub : Stats;

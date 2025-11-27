@@ -1,4 +1,4 @@
-import type { ChangeInfo } from '../..';
+import type { AccessorResponse, ChangeInfo } from '../..';
 
 import type { PathIdInfo } from './repository/paths';
 
@@ -18,15 +18,11 @@ import PathRepository from './repository/paths';
 import AtomValueRepository from './repository/atom-value';
 
 import AccessorCache from '.';
+import { isReadonly } from '../../test-artifacts/utils';
 
 const Accessor = AccessorModule.default;
 
-/* @debug */
-// "(\w+)": --- $1:
-// Any<(\w+)> --- expect.any( $1 ) //
-// console.info( onChangeMock.mock.calls[ 0 ] );
-describe( '1xxxx', () => {
-// describe( 'AccessorCache class', () => {
+describe( 'AccessorCache class', () => {
 
 	describe( 'atomize(...)', () => {
 		let cache : AccessorCache<{}>;
@@ -164,6 +160,29 @@ describe( '1xxxx', () => {
 			expect( getPathInfoAtSpy.mock.results[ 1 ].value ).toEqual({
 				sanitizedPathId: 1, sourcePathId: 1
 			});
+		} );
+		describe( 'result traits', () => {
+			// setting up original accessor data at ['a[2].v.c', 'a.c[22][3].e[0]']
+			const PATHS = [ 'a[2].v.c', 'a.c[22][3].e[0]' ];
+			let result : AccessorResponse<{}>;
+			beforeAll(() => {
+				const cache = new AccessorCache({
+					a: {
+						2: { v: { c: { x: 88, y: 99, z: 110 } } },
+						c: { 22: [ 1, 2, 3, { e: [ 92, 'testing' ] } ] }
+					}
+				});
+				result = cache.get( 'REQUEST_1', ...PATHS );
+			});
+			test( `ensures that responses are mapped to client supplied paths`, () => {
+				expect( result ).toEqual({
+					'a[2].v.c': { x: 88, y: 99, z: 110 },
+					'a.c[22][3].e[0]': 92
+				});
+			} );
+			test( `returns only readonly properties`, () => {
+				expect( Object.values( result ).every( isReadonly ) ).toBe( true );
+			} );
 		} );
 	} );
 	describe( 'unlinkClient(...)', () => {

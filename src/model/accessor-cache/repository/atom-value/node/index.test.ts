@@ -6,19 +6,16 @@ import {
 } from '@jest/globals';
 
 import { GLOBAL_SELECTOR } from '../../../../../constants';
-import { isString, set } from '../../../../../utils';
+import { set } from '../../../../../utils';
 import PathRepository from '../../paths';
 import Atom from '../../../../atom';
 import AtomNode from '.';
 
+import { isReadonly } from '../../../../../test-artifacts/utils';
+
 type Data = ReturnType<typeof getChangeData>;
 
-/* @debug */
-// "(\w+)": --- $1:
-// Any<(\w+)> --- expect.any( $1 ) //
-// console.info( onChangeMock.mock.calls[ 0 ] );
-describe( '1xxxxd', () => {
-// describe( 'AtomNode class', () => {
+describe( 'AtomNode class', () => {
 	describe( 'root node', () => {
 		let rootNode : AtomNode<Data>;
 		beforeAll(() => { rootNode = AtomNode.createRoot() });
@@ -526,8 +523,7 @@ describe( '1xxxxd', () => {
 			} );
 			describe( '', () => {
 				const a = getArtifact();
-				test( '1xxxxc', () => {
-				// test( 'simply converts a middle non-root/non-leaf atom node to an inactive connective node', () => {
+				test( 'simply converts a middle non-root/non-leaf atom node to an inactive connective node', () => {
 					a.activeRoot.insertAtomAt(
 						a.activePathRepo.getPathInfoAt([
 							...a.activePathTokens, 'c', 'm', 'k', 'b'
@@ -544,17 +540,10 @@ describe( '1xxxxd', () => {
 					expect( a.activeNode.fullPath ).toEqual( a.activePathTokens );
 					expect( a.activeNode.isLeaf ).toEqual( false );
 					a.activeNode.remove();
-					const deActivatedNode = a.activeRoot.findActiveNodeAt( a.activePathTokens )!;
-					expect( deActivatedNode ).not.toBe( a.activeNode );
-
-					// @debug
-					console.info( ' >< '.repeat( 33 ) );
-					console.info( deActivatedNode );
-
-					expect( deActivatedNode.isActive ).toBe( false );
-					expect(() => deActivatedNode.fullPath ).toThrow();
-					expect( deActivatedNode.isLeaf ).toEqual( false );
-					
+					expect( a.activeRoot.findActiveNodeAt( a.activePathTokens ) ).toBeNull();
+					let node = a.activeRoot;
+					for( const key of a.activePathTokens ) { node = node.branches[ key ] }
+					expect( node.isActive ).toBe( false );
 				} );
 			} );
 			describe( '', () => {
@@ -770,21 +759,6 @@ function createTestAtomArtifact( originData : Data ) {
 		pathRepo.getPathInfoAt( 't.y' ).sanitizedPathId
 	].forEach( id => root.insertAtomAt( id, pathRepo, originData ) );
 	return { pathRepo, root }
-}
-
-function isReadonly( v : Record<string,{}> ) {
-	if(
-		Object.isFrozen( v ) ||
-		isString( v ) ||
-		!Object.keys( v ).length
-	) {
-		return true;
-	}
-	for( let k in v ) {
-		if( !isReadonly( v[ k ] ) ) {
-			return false;
-		}
-	}
 }
 
 function getChangeData()  {
