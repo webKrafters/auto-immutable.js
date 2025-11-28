@@ -45,7 +45,7 @@ describe( 'Immutable class', () => {
         expect( conn11.get( path )[ path ] ).toBeUndefined();
 
         conn01.set({ test: [ 43, 90, 78, 22 ] });
-        
+
         expect( conn00.get( path )[ path ] ).toBe( 78 );
         expect( conn01.get( path )[ path ] ).toBe( 78 );
         expect( conn02.get( path )[ path ] ).toBe( 78 );

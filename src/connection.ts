@@ -12,6 +12,10 @@ import type {
     ValueObjectCloneable
 } from '.';
 
+import clonedeep from '@webkrafters/clone-total';
+
+import { makeReadonly } from './utils';
+
 import setValue from './set';
 
 import { Immutable } from './main';
@@ -27,52 +31,53 @@ export interface Source<T extends Value> {
 
 export class Connection<T extends Value> {
 
-    #endSourceWatch : () => void;
-    #id : string;
-    #source : Source<T>
+    private _endSourceWatch : () => void;
+    private _id : string;
+    private _source : Source<T>
 
     constructor( id : string, source: Source<Value> );
     constructor( id : string, source: Source<ValueObject> );
     constructor( id : string, source: Source<ValueObjectCloneable> );
     constructor( id : string, source: Source<T> ){
-        this.#id = id;
-        this.#source = source;
-        this.#endSourceWatch = this.#source.key.onClose(
+        this._id = id;
+        this._source = source;
+        this._endSourceWatch = this._source.key.onClose(
             () => this.disconnect()
         );
     }
 
     get disconnected() {
-        if( this.#source ) {
-            if( this.#source?.map.get( this.#source.key ) instanceof AccessorCache ) {
-                return false;
-            }
-            // addresses eventual gc collection of source immutable when not
-            // properly disposed. (i.e. w/o calling Immutable.close(...) prior)
-            // istanbul ignore next
-            this.#source = undefined;
+        if( !this._source ) { return true }
+        if( this._source?.map.get( this._source.key ) instanceof AccessorCache ) {
+            return false;
         }
+        // addresses eventual gc collection of source immutable when not
+        // properly disposed. (i.e. w/o calling Immutable.close(...) prior)
+        // istanbul ignore next
+        this._source = undefined;
+        // istanbul ignore next
         return true;
     }
-    get instanceId() { return this.#id }
+    
+    get instanceId() { return this._id }
 
     @invoke
     disconnect() {
-        this.#source.map
-            .get( this.#source.key )
-            .unlinkClient( this.#id );
-        this.#endSourceWatch();
-        this.#endSourceWatch = undefined;
-        this.#source = undefined;
+        this._source.map
+            .get( this._source.key )
+            .unlinkClient( this._id );
+        this._endSourceWatch();
+        this._endSourceWatch = undefined;
+        this._source = undefined;
     }
 
     @invoke
     get( ...propertyPaths : Array<string> ) {
-        return this.#source.map
-            .get( this.#source.key )
-            .get( this.#id, ...propertyPaths );
+        return this._source.map
+            .get( this._source.key )
+            .get( this._id, ...propertyPaths );
     }
-
+  
     set( changes : UpdatePayload<T>, onComplete? : Listener ) : void;
 	set( changes : UpdatePayloadArray<T>, onComplete? : Listener ) : void;
 	set( changes : UpdatePayloadArrayCore<T>, onComplete? : Listener ) : void;
@@ -83,21 +88,20 @@ export class Connection<T extends Value> {
     @invoke
     set( changes : any, onComplete: Listener = deps.noop ) : void {
         deps.setValue(
-            this.#source.map.get( this.#source.key ).origin,
+            this._source.map.get( this._source.key ).origin,
             changes,
-            changes => {
-                // addresses eventual gc collection when not properly
-                // disposed. (i.e. w/o calling this.disconnect(...) prior)
-                // istanbul ignore next
-                if( this.disconnected ) { return }
-                this.#source.map
-                    .get( this.#source.key )
-                    .atomize( changes as Changes<T> );
-                onComplete( changes );
+            ( changes, paths ) => {
+                const sharedChanges = clonedeep( changes );
+                this._source.map
+                    .get( this._source.key )
+                    .atomize( changes, paths );
+                onComplete(
+                    makeReadonly( sharedChanges ),
+                    makeReadonly( paths )
+                );
             }
         );
     }
-
 }
 
 function invoke<C>( method: Function, context: C ) {

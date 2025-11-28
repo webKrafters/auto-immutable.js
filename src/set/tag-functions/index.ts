@@ -1,5 +1,7 @@
 import type {
 	BaseType,
+	GetElementType,
+	KeyType,
 	TagCommand,
 	TagType,
 	UpdateStats as Stats,
@@ -10,28 +12,33 @@ type Predicate = (
 	value : Value,
 	valueKey : string,
 	stats : Stats
-) => boolean
+) => boolean;
 
-type TaggedChanges<
-	T extends Array<any> | Value,
-	K extends keyof T,
-	TAG extends TagType
-> = Array<TagCommand<TAG, T> | BaseType> | Partial<T & {[P in K]: TagCommand<TAG, T> & Value}>
+type IndexedChange<
+	A extends Array<GetElementType<A>>,
+	I extends keyof A = keyof A
+> = A[ I ]|TagCommand<TagType, A, I>;
+
+export type TaggedChanges<T extends Array<GetElementType<T>> | Value> = Partial<
+	{[K in keyof T]: T[ K ]|TagCommand<TagType, T, K>} | (
+		T extends Array<GetElementType<T>>
+			? {[index : string]: IndexedChange<T>}
+			: {[T in TagType]: TagCommand<T, Value, keyof Value>}
+	)
+>;
 
 type TagFunction = <
-	T extends Array<any> | Value,
-	K extends keyof T,
-	TAG extends TagType
+	T extends Array<GetElementType<T>> | Value,
+	K extends keyof T
 >(
 	value : T,
 	valueKey : K,
 	stats : Stats,
-	changes? : TaggedChanges<T, K, TAG>
+	changes? : TaggedChanges<T>
 ) => void;
 
 import isEmpty from 'lodash.isempty';
 import isEqual from 'lodash.isequal';
-import isPlainObject from 'lodash.isplainobject';
 
 import {
 	CLEAR_TAG,
@@ -46,7 +53,7 @@ import {
 import clonedeep from '@webkrafters/clone-total';
 import getProperty from '@webkrafters/get-property';
 
-import { isDataContainer } from '../../utils/index';
+import { isDataContainer, isPlainObject } from '../../utils';
 
 /**
  * Sets a value slice to its empty value equivalent
@@ -55,13 +62,13 @@ import { isDataContainer } from '../../utils/index';
  * @example
  * // given the following value:
  * const value = {name: 'test', nested: {name: 'nested', items: ['a', 'b', 'c', 'd', 'e', 'f'], fn: () => {}}}
- * $clear(value, 'name', {hasChanges: false}, {name: {'@@CLEAR': *}, ...}) // sets `value.name` = ''
- * $clear(value, 'nested', {hasChanges: false}, {nested: {'@@CLEAR': *},...}) // sets `value.nested` = {}
- * $clear(value.nested, 'name', {hasChanges: false}, {name: {'@@CLEAR': *}, ...}) // sets `value.nested.name` = ''
- * $clear(value.nested, 'items', {hasChanges: false}, {items: {'@@CLEAR': *}, ...}) // sets `value.nested.items` = []
- * $clear(value.nested, 'items', {hasChanges: false}, {items: ['a', {'@@CLEAR': *}, 'c', 'd', 'e', 'f'], ...}) // sets `value.nested.items[2]` = ''
- * $clear(value.nested, 'fn', {hasChanges: false}, {fn: {'@@CLEAR': *}, ...}) // sets `value.nested.fn` = null
- * $clear(value.nested.items, 4, {hasChanges: false}, {4: {'@@CLEAR': *}, ...}) // sets `value.nested.items[4]` = ''
+ * $clear(value, 'name', new Stats(), {name: {'@@CLEAR': *}, ...}) // sets `value.name` = ''
+ * $clear(value, 'nested', new Stats(), {nested: {'@@CLEAR': *},...}) // sets `value.nested` = {}
+ * $clear(value.nested, 'name', new Stats(), {name: {'@@CLEAR': *}, ...}) // sets `value.nested.name` = ''
+ * $clear(value.nested, 'items', new Stats(), {items: {'@@CLEAR': *}, ...}) // sets `value.nested.items` = []
+ * $clear(value.nested, 'items', new Stats(), {items: ['a', {'@@CLEAR': *}, 'c', 'd', 'e', 'f'], ...}) // sets `value.nested.items[2]` = ''
+ * $clear(value.nested, 'fn', new Stats(), {fn: {'@@CLEAR': *}, ...}) // sets `value.nested.fn` = null
+ * $clear(value.nested.items, 4, new Stats(), {4: {'@@CLEAR': *}, ...}) // sets `value.nested.items[4]` = ''
  */
 export const $clear = (() => {
 	const defaultPredicate : Predicate = () => true;
@@ -69,7 +76,7 @@ export const $clear = (() => {
 	const setDefault = ( value, valueKey, stats, changes, predicate = defaultPredicate, _value = null ) => {
 		if( predicate( value, valueKey, stats ) ) {
 			value[ valueKey ] = _value;
-			stats.hasChanges = true;
+			addToStatsTable([ valueKey ], stats );
 		}
 		finishTagRequest( changes, valueKey, CLEAR_TAG );
 	};
@@ -82,12 +89,13 @@ export const $clear = (() => {
 			return finishTagRequest( changes as Value, valueKey, CLEAR_TAG );
 		}
 		if( isPlainObject( _value ) ) {
-			let hasChanges = false;
+			let changed = false;
 			for( const k in _value ) { // remove properties singularly b/c where value === the setValue `value` argument, we may not change its reference
 				delete value[ valueKey ][ k ];
-				hasChanges = true;
+				addToStatsTable([ valueKey, k ], stats );
+				changed = true;
 			}
-			stats.hasChanges = stats.hasChanges || hasChanges;
+			changed && addToStatsTable([ valueKey ], stats );
 			return finishTagRequest( changes as Value, valueKey, CLEAR_TAG );
 		}
 		const type = _value.constructor.name;
@@ -105,9 +113,9 @@ export const $clear = (() => {
  * @example
  * // given the following value:
  * const value = {name: 'test', nested: {name: 'nested', items: ['a', 'b', 'c', 'd', 'e', 'f'], fn: () => {}}}
- * $delete(value, 'value', {hasChanges: false}, {value: {'@@DELETE': ['name', 'nested'], ...}, ...}) // removes the `name` and `nested` properties from `value`
- * $delete(value, 'nested', {hasChanges: false}, {nested: {'@@DELETE': ['fn', 'items', 'name'], ...}, ...}) // removes the 'fn', 'items' and 'name' properties from `value.nested`
- * $delete(value.nestetd, 'items', {hasChanges: false}, {items: {'@@DELETE': [0, 3], ...}, ...}) // removes indexes 0 and 3 `value.nested.items`
+ * $delete(value, 'value', new Stats(), {value: {'@@DELETE': ['name', 'nested'], ...}, ...}) // removes the `name` and `nested` properties from `value`
+ * $delete(value, 'nested', new Stats(), {nested: {'@@DELETE': ['fn', 'items', 'name'], ...}, ...}) // removes the 'fn', 'items' and 'name' properties from `value.nested`
+ * $delete(value.nestetd, 'items', new Stats(), {items: {'@@DELETE': [0, 3], ...}, ...}) // removes indexes 0 and 3 `value.nested.items`
  */
 export const $delete : TagFunction = ( value, valueKey, stats, changes ) => {
 	let deleteKeys = ( changes as Value )[ valueKey ][ DELETE_TAG ];
@@ -122,14 +130,15 @@ export const $delete : TagFunction = ( value, valueKey, stats, changes ) => {
 		if( isEmpty( currValue ) ) { throw new Error( 'Delete called on empty value.' ) }
 	} catch( e ) { return finish() }
 	deleteKeys = Array.from( new Set( deleteKeys ) );
-	let hasChanges = false;
+	let changed = false;
 	if( !Array.isArray( currValue ) ) {
 		for( const k of deleteKeys ) {
 			if( !getProperty( currValue, k ).exists ) { continue }
 			delete value[ valueKey ][ k ];
-			hasChanges = true;
+			addToStatsTable([ valueKey, k ], stats );
+			changed = true;
 		}
-		stats.hasChanges = stats.hasChanges || hasChanges;
+		changed && addToStatsTable([ valueKey ], stats );
 		return finish();
 	}
 	const currLen = currValue.length;
@@ -161,7 +170,7 @@ export const $delete : TagFunction = ( value, valueKey, stats, changes ) => {
 	if( currLen === newValue.length ) { return finish() }
 	( value[ valueKey ] as Array<any> ).length = 0;
 	( value[ valueKey ] as Array<any> ).push( ...newValue );
-	stats.hasChanges = true;
+	addToStatsTable([ valueKey ], stats );
 	finish();
 };
 
@@ -172,7 +181,7 @@ export const $delete : TagFunction = ( value, valueKey, stats, changes ) => {
  * @example
  * // given the following value:
  * const value = {name: 'test', nested: {name: 'nested', items: ['a', 'b', 'c', 'd', 'e', 'f'], fn: () => {}}}
- * $move(value.nested, 'items', {hasChanges: false}, {items: {'@@MOVE': [0, 3, 2], ...}, ...}) // moves `value.nested.items` 'a' and 'b' from indexes 0 and 1 to indexes 3 and 4.
+ * $move(value.nested, 'items', new Stats(), {items: {'@@MOVE': [0, 3, 2], ...}, ...}) // moves `value.nested.items` 'a' and 'b' from indexes 0 and 1 to indexes 3 and 4.
  */
 export const $move : TagFunction = ( value, valueKey, stats, changes ) => {
 	const args = ( changes as Value )[ valueKey ][ MOVE_TAG ];
@@ -194,7 +203,7 @@ export const $move : TagFunction = ( value, valueKey, stats, changes ) => {
 	const maxTransferLen = sLen - from;
 	if( numItems > maxTransferLen ) { numItems = maxTransferLen }
 	( value[ valueKey ] as Array<any> ).splice( to, 0, ..._value.splice( from, numItems ) );
-	stats.hasChanges = true;
+	addToStatsTable([ valueKey ], stats );
 	finish();
 };
 
@@ -206,7 +215,7 @@ export const $move : TagFunction = ( value, valueKey, stats, changes ) => {
  * @example
  * // given the following value:
  * const value = {name: 'test', nested: {name: 'nested', items: ['a', 'b', 'c', 'd', 'e', 'f'], fn: () => {}}}
- * $push(value.nested, 'items', {hasChanges: false}, {items: {'@@PUSH': ['x', 'y', 'z'], ...}, ...}) // sequentially appends 'x', 'y' and 'z' to `value.nested.items`.
+ * $push(value.nested, 'items', new Stats(), {items: {'@@PUSH': ['x', 'y', 'z'], ...}, ...}) // sequentially appends 'x', 'y' and 'z' to `value.nested.items`.
  */
 export const $push : TagFunction = ( value, valueKey, stats, changes ) => { // preforms array.push on the value[valueKey] array
 	const args = ( changes as Value )[ valueKey ][ PUSH_TAG ];
@@ -217,7 +226,7 @@ export const $push : TagFunction = ( value, valueKey, stats, changes ) => { // p
 		return finishTagRequest( changes as Value, valueKey, PUSH_TAG );
 	}
 	( value[ valueKey ] as Array<any> ).push( ...args );
-	stats.hasChanges = true;
+	addToStatsTable([ valueKey ], stats );
 	finishTagRequest( changes as Value, valueKey, PUSH_TAG );
 };
 
@@ -228,13 +237,13 @@ export const $push : TagFunction = ( value, valueKey, stats, changes ) => { // p
  * @example
  * // given the following value:
  * const value = {name: 'test', nested: {name: 'nested', items: ['a', 'b', 'c', 'd', 'e', 'f'], fn: () => {}}}
- * $replace(value, 'name', {hasChanges: false}, {name: {'@@REPLACE': new value, ...}, ...}) // sets `value.name` = new value
- * $replace(value, 'nested', {hasChanges: false}, {nested: {'@@REPLACE': new value, ...}, ...}) // sets `value.nested` = new value
- * $replace(value.nested, 'name', {hasChanges: false}, {name: {'@@REPLACE': new value, ...}, ...}) // sets `value.nested.name` = new value
- * $replace(value.nested, 'items', {hasChanges: false}, {items: {'@@REPLACE': new value, ...}, ...}) // sets `value.nested.items` = new value
- * $replace(value.nested, 'items', {hasChanges: false}, {items: ['a', {'@@REPLACE': new value, ...}, 'c', 'd', 'e', 'f'], ...}) // sets `value.nested.items[2]` = new value
- * $replace(value.nested, 'fn', {hasChanges: false}, {fn: {'@@REPLACE': new value, ...}, ...}) // sets `value.nested.fn` = new value
- * $replace(value.nested.items, 4, {hasChanges: false}, {4: {'@@REPLACE': new value, ...}, ...}) // sets `value.nested.items[4]` = new value
+ * $replace(value, 'name', new Stats(), {name: {'@@REPLACE': new value, ...}, ...}) // sets `value.name` = new value
+ * $replace(value, 'nested', new Stats(), {nested: {'@@REPLACE': new value, ...}, ...}) // sets `value.nested` = new value
+ * $replace(value.nested, 'name', new Stats(), {name: {'@@REPLACE': new value, ...}, ...}) // sets `value.nested.name` = new value
+ * $replace(value.nested, 'items', new Stats(), {items: {'@@REPLACE': new value, ...}, ...}) // sets `value.nested.items` = new value
+ * $replace(value.nested, 'items', new Stats(), {items: ['a', {'@@REPLACE': new value, ...}, 'c', 'd', 'e', 'f'], ...}) // sets `value.nested.items[2]` = new value
+ * $replace(value.nested, 'fn', new Stats(), {fn: {'@@REPLACE': new value, ...}, ...}) // sets `value.nested.fn` = new value
+ * $replace(value.nested.items, 4, new Stats(), {4: {'@@REPLACE': new value, ...}, ...}) // sets `value.nested.items[4]` = new value
  */
 export const $replace : TagFunction = ( value, valueKey, stats, changes ) => {
 	applyReplaceCommand( REPLACE_TAG, value as Value, changes, valueKey, stats );
@@ -247,13 +256,13 @@ export const $replace : TagFunction = ( value, valueKey, stats, changes ) => {
  * @example
  * // given the following value:
  * const value = {name: 'test', nested: {name: 'nested', items: ['a', 'b', 'c', 'd', 'e', 'f'], fn: () => {}}}
- * $set(value, 'name', {hasChanges: false}, {name: {'@@SET': new value OR currentName => new value, ...}, ...}) // sets `value.name` = new value
- * $set(value, 'nested', {hasChanges: false}, {nested: {'@@SET': new value OR currentNested => new value, ...}, ...}) // sets `value.nested` = new value
- * $set(value.nested, 'name', {hasChanges: false}, {name: {'@@SET': new value OR currentName => new value, ...}, ...}) // sets `value.nested.name` = new value
- * $set(value.nested, 'items', {hasChanges: false}, {items: {'@@SET': new value OR currentItems => new value, ...}, ...}) // sets `value.nested.items` = new value
- * $set(value.nested, 'items', {hasChanges: false}, {items: ['a', {'@@SET': new value OR current2nd => new value, ...}, 'c', 'd', 'e', 'f'], ...}) // sets `value.nested.items[2]` = new value
- * $set(value.nested, 'fn', {hasChanges: false}, {fn: {'@@SET': new value OR currentFn => new value, ...}, ...}) // sets `value.nested.fn` = new value
- * $set(value.nested.items, 4, {hasChanges: false}, {4: {'@@SET': new value OR current4th => new value, ...}, ...}) // sets `value.nested.items[4]` = new value
+ * $set(value, 'name', new Stats(), {name: {'@@SET': new value OR currentName => new value, ...}, ...}) // sets `value.name` = new value
+ * $set(value, 'nested', new Stats(), {nested: {'@@SET': new value OR currentNested => new value, ...}, ...}) // sets `value.nested` = new value
+ * $set(value.nested, 'name', new Stats(), {name: {'@@SET': new value OR currentName => new value, ...}, ...}) // sets `value.nested.name` = new value
+ * $set(value.nested, 'items', new Stats(), {items: {'@@SET': new value OR currentItems => new value, ...}, ...}) // sets `value.nested.items` = new value
+ * $set(value.nested, 'items', new Stats(), {items: ['a', {'@@SET': new value OR current2nd => new value, ...}, 'c', 'd', 'e', 'f'], ...}) // sets `value.nested.items[2]` = new value
+ * $set(value.nested, 'fn', new Stats(), {fn: {'@@SET': new value OR currentFn => new value, ...}, ...}) // sets `value.nested.fn` = new value
+ * $set(value.nested.items, 4, new Stats(), {4: {'@@SET': new value OR current4th => new value, ...}, ...}) // sets `value.nested.items[4]` = new value
  */
 export const $set = (() => {
 	const toString = Object.prototype.toString;
@@ -275,7 +284,7 @@ export const $set = (() => {
  * @example
  * // given the following value:
  * const value = {name: 'test', nested: {name: 'nested', items: ['a', 'b', 'c', 'd', 'e', 'f'], fn: () => {}}}
- * $splice(value.nested, 'items', {hasChanges: false}, {items: {'@@SPLICE': [3, 3, 'y', 'z'], ...}, ...}) // replaces 'd', 'e' and 'f' with 'y' and 'z' in `value.nested.items`.
+ * $splice(value.nested, 'items', new Stats(), {items: {'@@SPLICE': [3, 3, 'y', 'z'], ...}, ...}) // replaces 'd', 'e' and 'f' with 'y' and 'z' in `value.nested.items`.
  */
 export const $splice : TagFunction = ( value, valueKey, stats, changes ) => {
 	const args = ( changes as Value )[ valueKey ][ SPLICE_TAG ];
@@ -307,7 +316,7 @@ export const $splice : TagFunction = ( value, valueKey, stats, changes ) => {
 	}
 	if( deleteCount > 0 || iLen ) {
 		( value[ valueKey ] as Array<any> ).splice( start, deleteCount, ...items );
-		stats.hasChanges = true;
+		addToStatsTable([ valueKey ], stats );
 	}
 	finishTagRequest( changes as Value, valueKey, SPLICE_TAG );
 };
@@ -348,7 +357,7 @@ export const isArrayOnlyTag = (() => {
 	};
 	function fn( tag : BaseType ) : boolean;
 	function fn( tag : TagType ) : boolean;
-	function fn( tag : any ) : boolean {
+	function fn( tag ) : boolean {
 		return containsTag( ARRAY_TAGS, tag );
 	}
 	return fn;
@@ -387,7 +396,7 @@ function applyReplaceCommand<T extends Value, TAG extends TagType>( tag : any, v
 	) ) {
 		if( value[ valueKey ] !== replacement ) {
 			value[ valueKey ] = replacement;
-			stats.hasChanges = true;
+			addToStatsTable([ valueKey ], stats );
 		}
 		return finishTagRequest( changes, valueKey, tag );
 	}
@@ -412,7 +421,7 @@ function applyReplaceCommand<T extends Value, TAG extends TagType>( tag : any, v
 	for( const k in replacement ) {
 		value[ valueKey ][ k ] = replacement[ k ];
 	}
-	stats.hasChanges = true;
+	addToStatsTable([ valueKey ], stats );
 	finishTagRequest( changes, valueKey, tag );
 }
 
@@ -435,3 +444,8 @@ const finishTagRequest = (() => {
 	};
 	return runCloser;
 })();
+
+function addToStatsTable( valuePathTokens : Array<KeyType>, stats : Stats ) {
+	stats.addChangePath([ ...stats.currentPathToken, ...valuePathTokens ]);
+}
+	

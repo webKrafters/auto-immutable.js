@@ -24,7 +24,8 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
-      
+          
+      - run: rm -rf package-lock.js, node-modules
       - run: npm ci
       - run: npm install
       - run: npm run test:core -- --coverage

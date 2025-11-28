@@ -1,86 +1,92 @@
 import type {
 	AccessorPayload,
-	AccessorResponse
+	AccessorResponse,
+	Value
 } from '../..';
 
-import type Atom from '../atom';
+import AtomValueRepository from '../accessor-cache/repository/atom-value';
 
-const MODERATE_NUM_PATHS_THRESHOLD = 8;
+import PathRepository from '../accessor-cache/repository/paths';
 
-class Accessor {
+class Accessor <T extends Value> {
 
-	static #NUM_INSTANCES = 0;
+	private static _NUM_INSTANCES = 0;
 
-	#clients : Set<string>;
-	#id : number;
-	#paths : Array<string>;
-	#value : AccessorResponse;
+	private _atomRegistry : AccessorPayload<T>;
+	private _clients = new Set<string>();
+	private _id : number;
+	private _pathRepo : PathRepository;
+	private _sourcePathIds : Array<number>;
+	private _valueRepo : AtomValueRepository<T>;
 
-	public outdatedPaths : Array<string>;
-
-	constructor( accessedPropertyPaths : Array<string> ) {
-		this.#clients = new Set();
-		this.#id = ++Accessor.#NUM_INSTANCES;
-		this.#paths = Array.from( new Set( accessedPropertyPaths ) );
-		this.outdatedPaths = this.#paths.slice();
-		this.#value = {};
+	constructor(
+		sourcePathIds : Array<number>,
+		atomRegistry : AccessorPayload<T>,
+		pathRepo : PathRepository,
+		valueRepo : AtomValueRepository<T>
+	) {
+		this._id = ++Accessor._NUM_INSTANCES;
+		this._atomRegistry = atomRegistry;
+		this._pathRepo = pathRepo;
+		this._sourcePathIds = [ ...sourcePathIds ];
+		this._valueRepo = valueRepo;
 	}
 
-	get numClients() { return this.#clients.size }
+	get id() { return this._id }
 
-	get id() { return this.#id }
+	get numClients() { return this._clients.size }
 
-	get paths() { return this.#paths }
+	get sourcePathIds() { return this._sourcePathIds }
 
-	get value() { return this.#value }
-
-	#setValueAt<V>( propertyPath : string, atom : Atom<V> ) {
-		if( !atom ) { return }
-		!atom.isConnected( this.#id ) &&
-		atom.connect( this.#id );
-		this.#value[ propertyPath ] = atom.value;
+	get value() {
+		const data : AccessorResponse<T> = {};
+		const atom = this._atomRegistry;
+		for( const pathId of this._sourcePathIds ) {
+			data[ pathId ] = atom[ pathId ].value;
+		}
+		return data;
 	}
-
-	addClient( clientId : string ) { this.#clients.add( clientId ) }
-
-	hasClient( clientId : string ) : boolean { return this.#clients.has( clientId ) }
-
-	removeClient( clientId : string ) : boolean { return this.#clients.delete( clientId ) }
 	
-	/** @param atoms - Curated slices of value object currently requested */
-	refreshValue( atoms : AccessorPayload ) : AccessorResponse {
-		// istanbul ignore next
-		if( !this.outdatedPaths.length ) { return this.#value }
-		let refreshLen;
-		const refreshPaths = {};
-		BUILD_REFRESH_OBJ: {
-			const pathSet = new Set( this.outdatedPaths );
-			this.outdatedPaths = [];
-			refreshLen = pathSet.size;
-			for( const p of pathSet ) { refreshPaths[ p ] = true }
+	addClient( clientId : string ) {
+		!this.numClients &&
+		this._secureAtoms();
+		this._clients.add( clientId );		
+	}
+
+	hasClient( clientId : string ) { return this._clients.has( clientId ) }
+
+	removeClient( clientId : string ) : boolean {
+		const deleted = this._clients.delete( clientId );
+		deleted && !this.numClients && this._releaseAtoms();
+		return deleted;
+	}
+
+	private _releaseAtoms(){
+		const atoms = this._atomRegistry;
+		const pathRepo = this._pathRepo;
+		for( const pathId of this._sourcePathIds ) {
+			if( !( pathId in atoms ) || (
+				atoms[ pathId ].removeAccessor( this._id ) > 0
+			) ) { continue }
+			atoms[ pathId ].remove();
+			delete atoms[ pathId ];
+			pathRepo.removeSourceId( pathId );
 		}
-		if( refreshLen >= this.#paths.length ) {
-			for( const p of this.#paths ) {
-				p in refreshPaths && this.#setValueAt( p, atoms[ p ] );
+	}
+
+	private _secureAtoms() {
+		const atoms = this._atomRegistry;
+		const valueRepo = this._valueRepo;
+		for( const pathId of this._sourcePathIds ) {
+			if( !( pathId in atoms ) ) {
+				const sanitizedPathId = this._pathRepo.getIdOfSanitizedPath(
+					this._pathRepo.getSanitizedPathOf( pathId )
+				);
+				valueRepo.addDataForAtomAt( sanitizedPathId );
+				atoms[ pathId ] = valueRepo.getAtomAt( sanitizedPathId );
 			}
-			return this.#value;
+			atoms[ pathId ].addAccessor( this._id );
 		}
-		if( this.#paths.length > MODERATE_NUM_PATHS_THRESHOLD ) {
-			const pathsObj = {};
-			for( const p of this.#paths ) { pathsObj[ p ] = true }
-			for( const p in refreshPaths ) {
-				p in pathsObj && this.#setValueAt( p, atoms[ p ] );
-			}
-			return this.#value;
-		}
-		// istanbul ignore next
-		for( const p in refreshPaths ) {
-			// istanbul ignore next
-			this.#paths.includes( p ) &&
-			this.#setValueAt( p, atoms[ p ] );
-		}
-		// istanbul ignore next
-		return this.#value;
 	}
 }
 

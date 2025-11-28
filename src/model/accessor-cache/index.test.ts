@@ -1,3 +1,7 @@
+import type { AccessorResponse, ChangeInfo } from '../..';
+
+import type { PathIdInfo } from './repository/paths';
+
 import {
 	afterAll,
 	beforeAll,
@@ -7,231 +11,240 @@ import {
 	test
 } from '@jest/globals';
 
-import type { SourceData } from '../../test-artifacts/data/create-data-obj';
+import { GLOBAL_SELECTOR } from '../..';
 
-type Value = Partial<SourceData>;
-
-import clonedeep from '@webkrafters/clone-total';
-
-import * as constants from '../../constants';
+import * as AccessorModule  from '../accessor';
+import PathRepository from './repository/paths';
+import AtomValueRepository from './repository/atom-value';
 
 import AccessorCache from '.';
-
-import _createSourceData from '../../test-artifacts/data/create-data-obj';
 import { isReadonly } from '../../test-artifacts/utils';
 
-const { GLOBAL_SELECTOR } = constants;
+const Accessor = AccessorModule.default;
 
 describe( 'AccessorCache class', () => {
-	const source : Value = createSourceData();
-	const accessorPaths = [
-		Object.freeze([
-			'friends[1].id',
-			'friends[1].name.last',
-			'history.places[2].year',
-			'name',
-			'nullTester',
-			'registered.time',
-			'tags[4]'
-		]),
-		Object.freeze([
-			'address',
-			'friends[1]',
-			'history',
-			'registered.time',
-			'tags[4]'
-		])
-	];
-	const cache = new AccessorCache( source );
+
 	describe( 'atomize(...)', () => {
-		const CLIENT_ID = 'TEST_AUTO_UPDATED';
-		let newChanges, latestFetchedSlice, origFetchedSlice, oldValues, registeredDay, source;
+		let cache : AccessorCache<{}>;
+		let mergeChangesSpy : jest.SpiedFunction<(
+			changes: ChangeInfo[ "changes" ],
+			paths: ChangeInfo[ "paths" ]
+		) => void>;
 		beforeAll(() => {
-			source = cache.origin;
-			registeredDay = source.registered.day;
-			newChanges = {
-				friends: { 1: { name: { first: 'Amanda' } } },
-				history: { places: { 2: { year: '2017 - 2022' } } },
-				registered: {
-					day: 30,
-					time: {
-						minutes: 0,
-						seconds: 0
-					}
-				},
-				tags: { 4: 'MY_TAG' }
-			}
-			oldValues = clonedeep({
-				address: source.address,
-				'friends[1]': source.friends[ 1 ],
-				history: source.history,
-				'registered.time': source.registered.time,
-				'tags[4]': source.tags[ 4 ]
-			});
-			origFetchedSlice = clonedeep( cache.get( CLIENT_ID, ...accessorPaths[ 1 ] ) );
-			// simulate value change
-			source.friends[ 1 ].name.first = newChanges.friends[ 1 ].name.first;
-			source.history.places[ 2 ].year = newChanges.history.places[ 2 ].year;
-			source.registered.day = newChanges.registered.day;
-			source.registered.time.minutes = newChanges.registered.time.minutes;
-			source.registered.time.seconds = newChanges.registered.time.seconds;
-			source.tags[ 4 ] = newChanges.tags[ 4 ];
-			/* simulate value change notification publishing */
-			cache.atomize( newChanges );
-			/* simulate client's request to refresh own value slice */
-			latestFetchedSlice = cache.get( CLIENT_ID, ...accessorPaths[ 1 ] );
+			cache = new AccessorCache({});
+			mergeChangesSpy = jest.spyOn( AtomValueRepository.prototype, 'mergeChanges' );
 		});
-		afterAll(() => {
-			source.address = oldValues.address;
-			source.friends[ 1 ] = oldValues[ 'friends[1]' ];
-			source.history = oldValues.history;
-			source.registered.day = registeredDay;
-			source.registered.time = oldValues[ 'registered.time' ];
-			source.tags[ 4 ] = oldValues[ 'tags[4]' ];
-			newChanges = null;
-			latestFetchedSlice = null;
-			origFetchedSlice = null;
-			oldValues = null;
-		});
-		test( 'confirms pre-update value object slice returns current slice from original value object', () => {
-			expect( Object.keys( origFetchedSlice ) ).toEqual( accessorPaths[ 1 ] );
-			expect( origFetchedSlice ).toStrictEqual({
-				address: oldValues.address,
-				'friends[1]': oldValues[ 'friends[1]' ],
-				history: oldValues.history,
-				'registered.time': oldValues[ 'registered.time' ],
-				'tags[4]': oldValues[ 'tags[4]' ]
-			});
+		beforeEach(() => { mergeChangesSpy.mockClear() });
+		afterAll(() => { mergeChangesSpy.mockRestore() });
+		test( 'is a noop if an empty second argument supplied', () => {
+			cache.atomize({}, []);
+			expect( mergeChangesSpy ).not.toHaveBeenCalled();
+			cache.atomize({ one: 1, two: 2 }, []);
+			expect( mergeChangesSpy ).not.toHaveBeenCalled();
 		} );
-		test(
-			'confirms post-update value object slice returns current slice from the updated value object',
-			() => {
-				const expected = clonedeep({
-					address: oldValues.address,
-					'friends[1]': oldValues[ 'friends[1]' ],
-					history: oldValues.history,
-					'registered.time': oldValues[ 'registered.time' ],
-					'tags[4]': oldValues[ 'tags[4]' ]
-				});
-				expected[ 'friends[1]' ].name.first = newChanges.friends[ 1 ].name.first;
-				expected.history.places[ 2 ].year = newChanges.history.places[ 2 ].year;
-				expected[ 'registered.time' ].minutes = newChanges.registered.time.minutes;
-				expected[ 'registered.time' ].seconds = newChanges.registered.time.seconds;
-				expected[ 'tags[4]' ] = newChanges.tags[ 4 ];
-				expect( latestFetchedSlice ).toStrictEqual( expected );
-			}
-		);
-		test(
-			'is disinterested in value object changes not occurring in any of its registered propertyPaths',
-			() => {
-				expect( 'registered.day' in origFetchedSlice ).toBe( false );
-				expect( 'registered.day' in latestFetchedSlice ).toBe( false );
-			}
-		);
-		test( 'will accept array of update payloads', () => {
-			const source = createSourceData() as Value & { nullTester?; unknown };
-			const cache = new AccessorCache( source );
-			expect(() => {
-				cache.atomize([
-					{ tags: { [ constants.PUSH_TAG ]: [ '_88_' ] } },
-					{ tags: { [ constants.MOVE_TAG ]: [ 0, 2 ] } },
-					{ tags: { [ constants.DELETE_TAG ]: [ 2 ] } },
-					{ nullTester: undefined },
-					{ tags: { [ constants.SPLICE_TAG ]: [ 4, 1, '_90_' ] } },
-					{ tags: { 2: 'jiveTest' } }
-				] );
-				cache.atomize({ nullTester: null });
-			}).not.toThrow();
-		} );
-		describe( 'incorporating new data updates', () => {
-			let existingVal, existingValClone, updatedVal;
-			beforeAll(() => {
-				const source : Value = createSourceData();
-				const cache = new AccessorCache( source );
-				const paths = [ ...accessorPaths[ 0 ], 'history', 'history.places[0].year' ];
-				existingVal = cache.get( CLIENT_ID, ...paths );
-				existingValClone = clonedeep( existingVal );
-				newChanges = { history: { places: { 2: { year: '2030' } } } };
-				source.history!.places[ 2 ].year = '2030';
-				cache.atomize( newChanges );
-				updatedVal = cache.get( CLIENT_ID, ...paths );
-			});
-			test( 'never alters its value property object reference', () => {
-				expect( existingVal ).toBe( updatedVal );
-				expect( existingVal ).toStrictEqual( updatedVal );
-				expect( existingValClone ).not.toEqual( updatedVal );
-			});
-			test( 'changes only properties of its return value affected by the new updates', () => {
-				for( const k in existingVal ) {
-					k === 'history' || k === 'history.places[2].year'
-						? expect( existingValClone[ k ] ).not.toEqual( updatedVal[ k ] )
-						: expect( existingValClone[ k ] ).toEqual( updatedVal[ k ] );
-				}
-			} );
+		test( 'merges changes into atoms', () => {
+			const changes = { composed: { one: 1 }, two: 2 };
+			const changedPaths = [[ 'composed', 'one' ], [ 'two' ]];
+			cache.atomize( changes, changedPaths );
+			expect( mergeChangesSpy ).toHaveBeenCalledTimes( 1 );
+			expect( mergeChangesSpy ).toHaveBeenCalledWith( changes, changedPaths );
 		} );
 	} );
 	describe( 'get(...)', () => {
-		describe( 'returned value', () => {
-			const retValExpected = {
-				'friends[1].id': 1,
-				'friends[1].name.last': 'Roberson',
-				'history.places[2].year': '2017',
-				name: {
-					first: 'Amber',
-					last: 'Sears'
-				},
-				nullTester: null,
-				'registered.time': {
-					hours: 9,
-					minutes: 55,
-					seconds: 46
-				},
-				'tags[4]': 'ullamco'
-			};
-			const retVal = cache.get(
-				expect.any( String ) as unknown as string,
-				...accessorPaths[ 0 ]
-			);
-			test( 'is a compiled slice of value object as referenced in the propertyPaths', () => {
-				expect( retVal ).toEqual( retValExpected );
-			} );
-			test( 'contains only readonly properties', () => {
-				expect( Object.values( retVal ).every( isReadonly ) ).toBe( true )
-			} );
+		let reachedFirstRun = false;
+		let cache : AccessorCache<{}>;
+		let addClientSpy : jest.SpiedFunction<(clientId: string) => void>;
+		let getPathInfoAtSpy : jest.SpiedFunction<(path: string) => PathIdInfo>;
+		// @ts-ignore
+		let accessorSpy = jest.SpiedClass<typeof AccessorModule>;
+		beforeAll(() => {
+			addClientSpy = jest.spyOn( Accessor.prototype, 'addClient' );
+			getPathInfoAtSpy = jest.spyOn( PathRepository.prototype, 'getPathInfoAt' );
+			accessorSpy = jest
+				.spyOn( AccessorModule, 'default' )
+				.mockImplementation(( ...args ) => new Accessor( ...args ));
+		});
+		beforeEach(() => {
+			if( !reachedFirstRun ) {
+				reachedFirstRun = true;
+			} else {
+				addClientSpy.mockClear();
+				getPathInfoAtSpy.mockClear();
+				accessorSpy.mockClear();
+			}
+			cache = new AccessorCache({});
+		});
+		afterAll(() => {
+			addClientSpy.mockRestore();
+			getPathInfoAtSpy.mockRestore();
+			accessorSpy.mockRestore();
+		});
+		test( `defaults to obtaining ${ GLOBAL_SELECTOR } data`, () => {
+			cache.get( 'TEST_CLIENT_ID' );
+			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 1 );
+			expect( getPathInfoAtSpy.mock.calls[ 0 ] ).toEqual([ GLOBAL_SELECTOR ]);
+			expect( getPathInfoAtSpy.mock.results[ 0 ].value ).toEqual({
+				sanitizedPathId: 1, sourcePathId: 1
+			});
 		} );
-		describe( 'empty propertyPaths behavior', () => {
-			const retVal = cache.get( 'TEST_EMPTY_PROPERTY_PATH' );
-			test( 'returns the whole value as readonly', () => {
-				expect( retVal ).toEqual({ [ GLOBAL_SELECTOR ]: source });
-				expect( Object.values( retVal ).every( isReadonly ) ).toBe( true );
+		test( `shares same accessor between clients`, () => {
+			// setting up original accessor data at ['a.v.c', 'a.c.e']
+			const PATHS = [ 'a.v.c', 'a.c.e' ];
+			cache.get( 'REQUEST_1', ...PATHS );
+			expect( addClientSpy ).toHaveBeenCalledTimes( 1 );
+			expect( addClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_1' ]);
+			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 2 );
+			expect( getPathInfoAtSpy.mock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 0 ].value ).toEqual({
+				sanitizedPathId: 1, sourcePathId: 1
+			});
+			expect( getPathInfoAtSpy.mock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 1 ].value ).toEqual({
+				sanitizedPathId: 2, sourcePathId: 2
+			});
+			// clearing out test mocks
+			addClientSpy.mockClear();
+			getPathInfoAtSpy.mockClear();
+			
+			// reusing same accessor for a different request
+
+			cache.get( 'REQUEST_2', PATHS[ 0 ], PATHS[ 1 ] );
+			expect( addClientSpy ).toHaveBeenCalledTimes( 1 );
+			expect( addClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_2' ]);
+			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 2 );
+			// retrieving first path from atom repo
+			expect( getPathInfoAtSpy.mock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 0 ].value ).toEqual({
+				sanitizedPathId: 1, sourcePathId: 1
+			});
+			// retrieving second path from atom repo
+			expect( getPathInfoAtSpy.mock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 1 ].value ).toEqual({
+				sanitizedPathId: 2, sourcePathId: 2
+			});
+		} );
+		test( `reordering access paths will not produce new aaccessor`, () => {
+			// setting up original accessor data at ['a.v.c', 'a.c.e']
+			const PATHS = [ 'a.v.c', 'a.c.e' ];
+			cache.get( 'REQUEST_1', ...PATHS );
+			expect( addClientSpy ).toHaveBeenCalledTimes( 1 );
+			expect( addClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_1' ]);
+			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 2 );
+			// adding first path to atom repo
+			expect( getPathInfoAtSpy.mock.calls[ 0 ] ).toEqual([ PATHS[ 0 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 0 ].value ).toEqual({
+				sanitizedPathId: 1, sourcePathId: 1
+			});
+			// adding second path to atom repo
+			expect( getPathInfoAtSpy.mock.calls[ 1 ] ).toEqual([ PATHS[ 1 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 1 ].value ).toEqual({
+				sanitizedPathId: 2, sourcePathId: 2
+			});
+			// clearing out test mocks
+			addClientSpy.mockClear();
+			getPathInfoAtSpy.mockClear();
+
+			// reusing same accessor for a request contaning reordered access paths
+			
+			cache.get( 'REQUEST_2', PATHS[ 1 ], PATHS[ 0 ] );
+			expect( addClientSpy ).toHaveBeenCalledTimes( 1 );
+			expect( addClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_2' ]);
+			expect( getPathInfoAtSpy ).toHaveBeenCalledTimes( 2 );
+			// retrieving second path from atom repo
+			expect( getPathInfoAtSpy.mock.calls[ 0 ] ).toEqual([ PATHS[ 1 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 0 ].value ).toEqual({
+				sanitizedPathId: 2, sourcePathId: 2
+			});
+			// retrieving first path from atom repo
+			expect( getPathInfoAtSpy.mock.calls[ 1 ] ).toEqual([ PATHS[ 0 ] ]);
+			expect( getPathInfoAtSpy.mock.results[ 1 ].value ).toEqual({
+				sanitizedPathId: 1, sourcePathId: 1
+			});
+		} );
+		describe( 'result traits', () => {
+			// setting up original accessor data at ['a[2].v.c', 'a.c[22][3].e[0]']
+			const PATHS = [ 'a[2].v.c', 'a.c[22][3].e[0]' ];
+			let result : AccessorResponse<{}>;
+			beforeAll(() => {
+				const cache = new AccessorCache({
+					a: {
+						2: { v: { c: { x: 88, y: 99, z: 110 } } },
+						c: { 22: [ 1, 2, 3, { e: [ 92, 'testing' ] } ] }
+					}
+				});
+				result = cache.get( 'REQUEST_1', ...PATHS );
+			});
+			test( `ensures that responses are mapped to client supplied paths`, () => {
+				expect( result ).toEqual({
+					'a[2].v.c': { x: 88, y: 99, z: 110 },
+					'a.c[22][3].e[0]': 92
+				});
+			} );
+			test( `returns only readonly properties`, () => {
+				expect( Object.values( result ).every( isReadonly ) ).toBe( true );
 			} );
 		} );
 	} );
 	describe( 'unlinkClient(...)', () => {
-		const CLIENT_ID = 'TEST_CLIENT';
-		let atomDisconnectSpy, accessorRemoveClientSpy;
-		let cache : AccessorCache<Value> | null;
+		class TestCache extends AccessorCache<{}> {
+			get numberOfAccessors() {
+				return Object.keys( this.accessRegister ).length;
+			}
+			public getAccessedPathGroupsBy( clientId : string ) {
+				return this. _getAccessedPathGroupsBy( clientId );
+			}
+		}
+		let reachedFirstRun = false;
+		let cache : TestCache;
+		let removeClientSpy : jest.SpiedFunction<(clientId: string) => void>;
 		beforeAll(() => {
-			const Atom = require( '../atom' ).default;
-			const Accessor = require( '../accessor' ).default;
-			atomDisconnectSpy = jest.spyOn(	Atom.prototype, 'disconnect' );
-			accessorRemoveClientSpy = jest.spyOn(	Accessor.prototype, 'removeClient' );
-			cache = new AccessorCache( createSourceData() as Value );
-			cache.get( CLIENT_ID, 'company' ); // this adds new clients to the structure
-			cache.unlinkClient( CLIENT_ID );
+			removeClientSpy = jest.spyOn( Accessor.prototype, 'removeClient' );
 		});
-		afterAll(() => {
-			cache = null;
-			accessorRemoveClientSpy.mockRestore();
-			atomDisconnectSpy.mockRestore();
+		beforeEach(() => {
+			if( !reachedFirstRun ) {
+				reachedFirstRun = true;
+			} else {
+				removeClientSpy.mockClear();
+			}
+			cache = new TestCache({});
 		});
-		test( 'disassociates client from its servicing accessor', () => {
-			expect( accessorRemoveClientSpy ).toHaveBeenCalledWith( CLIENT_ID );
+		afterAll(() => removeClientSpy.mockRestore() );
+		test( `removes client from all existing accessors`, () => {
+			const PATHS = [ 'a.v.c', 'a.c.e' ];
+			cache.get( 'REQUEST_1', ...PATHS, 'j.b.e' );
+			cache.get( 'REQUEST_2', ...PATHS );
+			cache.get( 'REQUEST_1', ...PATHS );
+			cache.unlinkClient( 'REQUEST_1' );
+			expect( removeClientSpy ).toHaveBeenCalledTimes( 2 );
+			expect( removeClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_1' ]);
+			expect( removeClientSpy.mock.calls[ 1 ] ).toEqual([ 'REQUEST_1' ]);
+			removeClientSpy.mockClear();
+			cache.unlinkClient( 'REQUEST_1' );
+			expect( removeClientSpy ).toHaveBeenCalledTimes( 1 );
+			removeClientSpy.mockClear();
+			cache.unlinkClient( 'REQUEST_2' );
+			expect( removeClientSpy ).toHaveBeenCalledTimes( 1 );
+			expect( removeClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_2' ]);
 		} );
-		test( 'disconnects any resulting clientless accessor from storage atom cell', () => {
-			expect( atomDisconnectSpy ).toHaveBeenCalledWith( expect.any( Number ) );
+		test( `discards an accessor withh last client removal`, () => {
+			expect( cache.numberOfAccessors ).toBe( 0 );
+			const PATHS = [ 'a.v.c', 'a.c.e' ];
+			cache.get( 'REQUEST_1', ...PATHS, 'j.b.e' );
+			cache.get( 'REQUEST_2', ...PATHS );
+			cache.get( 'REQUEST_1', ...PATHS );
+			expect( cache.numberOfAccessors ).toBe( 2 );
+			expect( cache.getAccessedPathGroupsBy( 'REQUEST_1' ) ).toHaveLength( 2 );
+			expect( cache.getAccessedPathGroupsBy( 'REQUEST_2' ) ).toHaveLength( 1 );
+			// will remove accessor at [ ...PATHS, 'j.b.e' ] along with the client REQUEST_1
+			cache.unlinkClient( 'REQUEST_1' );
+			expect( cache.numberOfAccessors ).toBe( 1 );
+			expect( cache.getAccessedPathGroupsBy( 'REQUEST_1' ) ).toHaveLength( 0 );
+			expect( cache.getAccessedPathGroupsBy( 'REQUEST_2' ) ).toHaveLength( 1 );
+			// will remove the remaining accessor at PATHS along with the last client REQUEST_2
+			cache.unlinkClient( 'REQUEST_2' );
+			expect( cache.numberOfAccessors ).toBe( 0 );
+			expect( cache.getAccessedPathGroupsBy( 'REQUEST_1' ) ).toHaveLength( 0 );
+			expect( cache.getAccessedPathGroupsBy( 'REQUEST_2' ) ).toHaveLength( 0 );
 		} );
 	} );
-} );
-
-function createSourceData() { return { ..._createSourceData(), nullTester: null } }
+} );	
