@@ -32,55 +32,58 @@ export const deps = {
 
 export class Closable {
     
-    #closed = false;
-    #listeners = new Set<Fn>();
+    private _closed = false;
+    private _listeners = new Set<Fn>();
 
-    get closed() { return this.#closed }
+    get closed() { return this._closed }
 
     @invoke
     close() {
-        this.#listeners.forEach( f => f() )
-        this.#closed = true;
+        this._listeners.forEach( f => f() )
+        this._closed = true;
     }
 
     @invoke
     onClose( fn : Fn ) {
         const _fn = () => {
             fn();
-            this.#offClose( _fn );
+            this.offClose( _fn );
         }
-        this.#listeners.add( _fn );
-        return () => this.#offClose( _fn );
+        this._listeners.add( _fn );
+        return () => this.offClose( _fn );
     }
 
     @invoke
-    #offClose( fn : Fn ) { this.#listeners.delete( fn ) }
+    offClose( fn : Fn ) { this._listeners.delete( fn ) }
 
 }
 
 export class Immutable<T extends Value = Value> extends Closable {
     
-    static #cacheMap = new WeakMap<Immutable<Value>, AccessorCache<Value>>(); 
+    private static _cacheMap = new WeakMap<
+        Immutable<Value>,
+        AccessorCache<Value>
+    >(); 
     
-    #numConnectionsCreated = 0;
+    private _numConnectionsCreated = 0;
     
     constructor( initValue : T ) {
         super();
-        Immutable.#cacheMap.set( this, deps.assignCache( initValue ) );
+        Immutable._cacheMap.set( this, deps.assignCache( initValue ) );
         deps.numCreated++;
     }
 
     close() {
         super.close();
-        Immutable.#cacheMap.delete( this );
+        Immutable._cacheMap.delete( this );
     }
 
     @invoke
     connect() {
         return new Connection<T>(
-            `${ deps.numCreated }:${ ++this.#numConnectionsCreated }`, {
+            `${ deps.numCreated }:${ ++this._numConnectionsCreated }`, {
                 key: this,
-                map: Immutable.#cacheMap
+                map: Immutable._cacheMap
             }
         );
     }

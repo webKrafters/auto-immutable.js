@@ -1,22 +1,17 @@
-import isPlainObject from 'lodash.isplainobject';
+import { isString } from '../utils';
 
-export const isReadonly = v => {
-	let isReadonly = true;
-	const verify = value => {
-		if( isPlainObject( value ) ) {
-			if( !Object.isFrozen( value ) ) { isReadonly = false } else {
-				for( const k in value ) { verify( value[ k ] ) }
-			}
-		} else if( Array.isArray( value ) ) {
-			if( !Object.isFrozen( value ) ) { isReadonly = false } else {
-				for( let i = 0, len = value.length; i < len; i++ ) {
-					verify( value[ i ] );
-				}
-			}
-		} else if( !Object.isFrozen( value ) ) {
-			isReadonly = false;
+export function isReadonly( v : Record<string,{}> ) {
+	if(
+		Object.isFrozen( v ) ||
+		isString( v ) ||
+		!Object.keys( v ).length
+	) {
+		return true;
+	}
+	for( let k in v ) {
+		if( !isReadonly( v[ k ] ) ) {
+			return false;
 		}
 	}
-	verify( v );
-	return isReadonly;
-};
+	return true;
+}

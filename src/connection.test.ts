@@ -6,9 +6,19 @@ import {
 	test
 } from '@jest/globals';
 
+import isEqual from 'lodash.isequal';
+
+import type { Value } from './';
+
 import AccessorCache from './model/accessor-cache';
 import { Immutable } from './main';
 import { deps, Connection } from './connection';
+
+type Data = Value & {
+    a : number,
+    b: { message: string },
+    valid: boolean
+};
 
 describe( 'Connection class', () => { 
     const setup = () => {
@@ -20,7 +30,7 @@ describe( 'Connection class', () => {
         const key = new Immutable({});
         const map = new WeakMap();
         map.set( key, imDeps.assignCache() );
-        const cn = new Connection( expectedId, { key, map } );
+        const cn = new Connection<Data>( expectedId, { key, map } );
         const teardown = () => {
             imDeps.assignCache = assignCacheOrig;
         }
@@ -34,7 +44,9 @@ describe( 'Connection class', () => {
         teardown();
     } );
     describe( '', () => {
-        let passedFoundTest, passedNoneFoundTest, passedUpdateCompleteNotifiedTest;
+        let passedFoundTest : boolean;
+        let passedNoneFoundTest : boolean;
+        let passedUpdateCompleteNotifiedTest : boolean;
         let updateTest : {[x:string]:any} = {};
         beforeAll(() => {
             const { cache, connection, teardown } = setup();
@@ -43,11 +55,11 @@ describe( 'Connection class', () => {
             
             let d = connection.get( ...propertyPaths );
             passedNoneFoundTest =
-            Object.keys( d ).length === 2
-                && d[ 'b.message' ] === undefined
-                && d.valid === undefined;
+                Object.keys( d ).length === 2
+                    && d[ 'b.message' ] === undefined
+                    && d.valid === undefined;
 
-            const protectedData = {
+            const protectedData : Data = {
                 a: 333,
                 b: {
                     message: 'Doing consumer testing...'
@@ -58,23 +70,29 @@ describe( 'Connection class', () => {
             const prevCacheOrigin = { ...cache.origin };
 
             const setCallback = jest.fn();
+
             connection.set( protectedData, setCallback );
 
             updateTest.prevCacheOrigin = prevCacheOrigin;
             updateTest.cacheOrigin = cache.origin;
             updateTest.data = protectedData;
-            
-            const setCallbackCalls = setCallback.mock.calls;
-            passedUpdateCompleteNotifiedTest =
-                setCallbackCalls.length === 1 && 
-                setCallbackCalls[ 0 ][ 0 ] === protectedData;
+            {
+                const setCallbackCalls = setCallback.mock.calls;
+                passedUpdateCompleteNotifiedTest =
+                    setCallbackCalls.length === 1 && 
+                    isEqual( setCallbackCalls[ 0 ][ 0 ], protectedData ) &&
+                    isEqual(
+                        setCallbackCalls[ 0 ][ 1 ],
+                        [ [ 'a' ], [ 'b' ], [ 'valid' ] ]
+                    );
+            }
 
             const v = connection.get( ...propertyPaths );
 
             passedFoundTest =
                 Object.keys( v ).length === 2
-                && v[ 'b.message' ] === protectedData.b.message
-                && v.valid === protectedData.valid;
+                && v[ 'b.message' ] as unknown as string === protectedData.b.message
+                && v.valid as unknown as boolean === protectedData.valid;
 
            teardown();
         } );
