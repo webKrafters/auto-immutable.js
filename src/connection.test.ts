@@ -8,11 +8,12 @@ import {
 
 import isEqual from 'lodash.isequal';
 
-import type { Value } from './';
+import { GLOBAL_SELECTOR, type Value } from './';
 
 import AccessorCache from './model/accessor-cache';
 import { Immutable } from './main';
 import { deps, Connection } from './connection';
+import clonedeep from '@webkrafters/clone-total';
 
 type Data = Value & {
     a : number,
@@ -48,6 +49,7 @@ describe( 'Connection class', () => {
         let passedNoneFoundTest : boolean;
         let passedUpdateCompleteNotifiedTest : boolean;
         let updateTest : {[x:string]:any} = {};
+        let protectedData : Data;
         beforeAll(() => {
             const { cache, connection, teardown } = setup();
 
@@ -59,7 +61,7 @@ describe( 'Connection class', () => {
                     && d[ 'b.message' ] === undefined
                     && d.valid === undefined;
 
-            const protectedData : Data = {
+            protectedData = {
                 a: 333,
                 b: {
                     message: 'Doing consumer testing...'
@@ -71,7 +73,7 @@ describe( 'Connection class', () => {
 
             const setCallback = jest.fn();
 
-            connection.set( protectedData, setCallback );
+            connection.set( clonedeep( protectedData ), setCallback );
 
             updateTest.prevCacheOrigin = prevCacheOrigin;
             updateTest.cacheOrigin = cache.origin;
@@ -112,6 +114,16 @@ describe( 'Connection class', () => {
             'calls any post update callback with the `changes` payload',
             () => { expect( passedUpdateCompleteNotifiedTest ).toBe( true ) }
         );
+        test( 'GLOBAL_SELECTOR returns a copy of the entire immutable object', () => {
+            const { connection } = setup();
+            const changes = clonedeep( protectedData );
+            connection.set( changes );
+            const gsData = connection.get(
+                GLOBAL_SELECTOR, 'a', 'valid'
+            )[ GLOBAL_SELECTOR ];
+            expect( gsData ).toStrictEqual( changes );
+            expect( gsData ).not.toBe( changes );
+        } );
     } );
     describe( 'disconnection', () => {
         test(
