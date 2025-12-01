@@ -78,11 +78,12 @@ class AtomNode<T extends Value>{
 	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
 	@activeNodesOnly
 	get value() : Readonly<T> {
-		if( this.isRootAtom ) { return this._sectionData }
-		return get(
-			this._rootAtomNode._sectionData,
-			this._pathToRootAtom
-		)._value as Readonly<T>;
+		return this.isRootAtom
+			? this._sectionData
+			: get(
+				this._rootAtomNode._sectionData,
+				this._pathToRootAtom
+			)._value as Readonly<T>;
 	}
 	/**
 	 * applicable only to nodes containing atoms: assert via a 
@@ -256,7 +257,7 @@ class AtomNode<T extends Value>{
 			this._pathToRootAtom = this.fullPath.slice( rootAtomNode.fullPath.length );
 			return;
 		}
-		this._sectionData = cloneDeep( get( origin, this.fullPath )._value );
+		this._sectionData = cloneDeep( this.isRoot ? origin : get( origin, this.fullPath )._value );
 		for( let descNodes = this._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
 			descNodes[ d ]._adjustToNewAtomNode( this );
 		}
