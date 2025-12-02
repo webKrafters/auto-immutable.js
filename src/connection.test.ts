@@ -15,6 +15,8 @@ import { Immutable } from './main';
 import { deps, Connection } from './connection';
 import clonedeep from '@webkrafters/clone-total';
 
+import createSourceData from './test-artifacts/data/create-data-obj';
+
 type Data = Value & {
     a : number,
     b: { message: string },
@@ -22,16 +24,16 @@ type Data = Value & {
 };
 
 describe( 'Connection class', () => { 
-    const setup = () => {
-        const cache = new AccessorCache({});
+    function setup<T extends {}>( originData : T = {} as T ) {
+        const cache = new AccessorCache<T>( originData );
         const imDeps = require( './main' ).deps;
         const  assignCacheOrig = imDeps.assignCache;
         imDeps.assignCache = () => cache;
         const expectedId = 'TEST ID';
-        const key = new Immutable({});
+        const key = new Immutable<T>( originData );
         const map = new WeakMap();
         map.set( key, imDeps.assignCache() );
-        const cn = new Connection<Data>( expectedId, { key, map } );
+        const cn = new Connection<T>( expectedId, { key, map } );
         const teardown = () => {
             imDeps.assignCache = assignCacheOrig;
         }
@@ -182,5 +184,56 @@ describe( 'Connection class', () => {
                 teardown();
             }
         );
+    } );
+    test( 'runs full fetch on complex paths', () => {
+        const source = createSourceData();
+        const { connection } = setup( source );
+        const data = connection.get(
+            'history.places[2].city',
+            'history.places[2].country',
+            'history.places[2].year',
+            'isActive',
+            'tags[5]',
+            'tags[6]',
+            '@@GLOBAL'
+        );
+        expect( data ).toEqual({
+            'history.places[2].city': source.history.places[ 2 ].city,
+            'history.places[2].country': source.history.places[ 2 ].country,
+            'history.places[2].year': source.history.places[ 2 ].year,
+            isActive: source.isActive,
+            'tags[5]': source.tags[ 5 ],
+            'tags[6]': source.tags[ 6 ],
+            '@@GLOBAL': source
+        });
+        connection.disconnect();
+    } );
+    test( 'handles atoms sharing', () => {
+        const source = createSourceData();
+        const { connection } = setup( source );
+        connection.get(
+            'history.places[2].city',
+            'history.places[2].country',
+            'history.places[2].year',
+            'isActive',
+            'tags[5]',
+            'tags[6]',
+            '@@GLOBAL'
+        );
+        const data2 = connection.get(
+            'friends[1].name.last',
+            'history.places[2].country',
+            'history.places[2].year',
+            'company',
+            'tags[5]',
+        );
+        expect( data2 ).toEqual({
+            'friends[1].name.last': source.friends[ 1 ].name.last,
+            'history.places[2].country': source.history.places[ 2 ].country,
+            'history.places[2].year': source.history.places[ 2 ].year,
+            company: source.company,
+            'tags[5]': source.tags[ 5 ],
+        });
+        connection.disconnect();
     } );
 } );
