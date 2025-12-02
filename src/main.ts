@@ -83,7 +83,10 @@ export class Immutable<T extends Value = Value> extends Closable {
         return new Connection<T>(
             `${ deps.numCreated }:${ ++this._numConnectionsCreated }`, {
                 key: this,
-                map: Immutable._cacheMap
+                map: Immutable._cacheMap as WeakMap<
+                    Immutable<T>,
+                    AccessorCache<T>
+                >
             }
         );
     }
