@@ -182,9 +182,7 @@ class AtomNode<T extends Value>{
 
 	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
 	@activeNodesOnly
-	remove() {
-		this.isLeaf ? this._destroy() : this._deactivate();
-	}
+	remove() { this.isLeaf ? this._destroy() : this._deactivate() }
 	
 	/**
 	 * This method allow user, from any node, to call set the value of an atom bearing node residing at or near the fullPath.\
@@ -252,7 +250,7 @@ class AtomNode<T extends Value>{
 		this._atom = new Atom();
 		this._fullPathRepo = pathRepo;
 		this._fullPathId = dottedPathId;
-		if( !!rootAtomNode ) { // for creating an active descedant atom node
+		if( rootAtomNode !== null ) { // for creating an active descedant atom node
 			this._rootAtomNode = rootAtomNode;
 			this._pathToRootAtom = this.fullPath.slice( rootAtomNode.fullPath.length );
 			return;
@@ -304,8 +302,9 @@ class AtomNode<T extends Value>{
 
 	private _adjustToNewAtomNode( newRootAtomNode : AtomNode<T> ) {
 		this._rootAtomNode = newRootAtomNode;
-		this._pathToRootAtom = this.fullPath.slice( newRootAtomNode.fullPath.length );
-		if( this.isLeaf ) { return }
+		this._pathToRootAtom = newRootAtomNode.key !== GLOBAL_SELECTOR
+			? this.fullPath.slice( newRootAtomNode.fullPath.length )
+			: this.fullPath;
 		for( let descNodes = this._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
 			descNodes[ d ]._adjustToNewAtomNode( this.rootAtomNode );
 		}
@@ -315,7 +314,6 @@ class AtomNode<T extends Value>{
 		this._sectionData = get( oldRootAtomNode._sectionData, this._pathToRootAtom )._value as T;
 		this._rootAtomNode = this;
 		this._pathToRootAtom = [];
-		if( this.isLeaf ) { return }
 		for( let descNodes = this._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
 			descNodes[ d ]._adjustToNewAtomNode( this );
 		}	
@@ -362,7 +360,7 @@ class AtomNode<T extends Value>{
 	 */
 	private _findNearestActiveDescendants() {
 		const nearestDescendants : Array<AtomNode<T>> = [];
-		( function searchDescendants( _node : AtomNode<T> ) {
+		!this.isLeaf && ( function searchDescendants( _node : AtomNode<T> ) {
 			for( const b in _node.branches ) {
 				_node.branches[ b ].isActive
 					? nearestDescendants.push( _node.branches[ b ] )

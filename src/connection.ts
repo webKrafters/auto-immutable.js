@@ -34,10 +34,6 @@ export class Connection<T extends Value> {
     private _endSourceWatch : () => void;
     private _id : string;
     private _source : Source<T>
-
-    constructor( id : string, source: Source<Value> );
-    constructor( id : string, source: Source<ValueObject> );
-    constructor( id : string, source: Source<ValueObjectCloneable> );
     constructor( id : string, source: Source<T> ){
         this._id = id;
         this._source = source;
