@@ -76,11 +76,12 @@ class Accessor <T extends Value> {
 
 	private _secureAtoms() {
 		const atoms = this._atomRegistry;
+		const pathRepo = this._pathRepo;
 		const valueRepo = this._valueRepo;
 		for( const pathId of this._sourcePathIds ) {
 			if( !( pathId in atoms ) ) {
-				const sanitizedPathId = this._pathRepo.getIdOfSanitizedPath(
-					this._pathRepo.getSanitizedPathOf( pathId )
+				const sanitizedPathId = pathRepo.getIdOfSanitizedPath(
+					pathRepo.getSanitizedPathOf( pathId )
 				);
 				valueRepo.addDataForAtomAt( sanitizedPathId );
 				atoms[ pathId ] = valueRepo.getAtomAt( sanitizedPathId );
