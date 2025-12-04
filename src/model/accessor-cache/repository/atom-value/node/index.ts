@@ -256,9 +256,7 @@ class AtomNode<T extends Value>{
 			return;
 		}
 		this._sectionData = cloneDeep( this.isRoot ? origin : get( origin, this.fullPath )._value );
-		for( let descNodes = this._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
-			descNodes[ d ]._adjustToNewRootAtom( this );
-		}
+		this._notifyNearestActiveDescendantsOfNewRootAtom( this );
 		this._rootAtomNode = this;
 	}
 
@@ -305,18 +303,14 @@ class AtomNode<T extends Value>{
 		this._pathToRootAtom = newRootAtomNode.key !== GLOBAL_SELECTOR
 			? this.fullPath.slice( newRootAtomNode.fullPath.length )
 			: this.fullPath;
-		for( let descNodes = this._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
-			descNodes[ d ]._adjustToNewRootAtom( newRootAtomNode );
-		}
+		this._notifyNearestActiveDescendantsOfNewRootAtom( newRootAtomNode );
 	}
 
 	private _convertToRootAtomNodeFrom( oldRootAtomNode : AtomNode<T>  ) {
 		this._sectionData = get( oldRootAtomNode._sectionData, this._pathToRootAtom )._value as T;
 		this._rootAtomNode = this;
 		this._pathToRootAtom = [];
-		for( let descNodes = this._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
-			descNodes[ d ]._adjustToNewRootAtom( this );
-		}	
+		this._notifyNearestActiveDescendantsOfNewRootAtom( this );
 	}
 
 	private _deactivate() {
@@ -389,6 +383,12 @@ class AtomNode<T extends Value>{
 				: head._head;
 		}
 		return head;
+	}
+
+	private _notifyNearestActiveDescendantsOfNewRootAtom( newRootAtomNode : AtomNode<T> ) {
+		for( let descNodes = this._findNearestActiveDescendants(), dLen = descNodes.length, d = 0; d < dLen; d++ ) {
+			descNodes[ d ]._adjustToNewRootAtom( newRootAtomNode );
+		}	
 	}
 
 	private _retainUnchangedDescendants( previousRootAtomValue : T ) {
