@@ -187,8 +187,9 @@ describe( 'Connection class', () => {
     } );
     test( 'runs full fetch on complex paths', () => {
         const source = createSourceData();
+        type Data = typeof source;
         const { connection } = setup( source );
-        const data = connection.get(
+        const sMap = [
             'history.places[2].city',
             'history.places[2].country',
             'history.places[2].year',
@@ -196,8 +197,8 @@ describe( 'Connection class', () => {
             'tags[5]',
             'tags[6]',
             '@@GLOBAL'
-        );
-        expect( data ).toEqual({
+        ];
+        expect( connection.get( ...sMap ) ).toEqual({
             'history.places[2].city': source.history.places[ 2 ].city,
             'history.places[2].country': source.history.places[ 2 ].country,
             'history.places[2].year': source.history.places[ 2 ].year,
@@ -205,6 +206,30 @@ describe( 'Connection class', () => {
             'tags[5]': source.tags[ 5 ],
             'tags[6]': source.tags[ 6 ],
             '@@GLOBAL': source
+        });
+        connection.set({
+            isActive: true,
+            history: {
+                places: {
+                    2: {
+                        city: 'Marakesh',
+                        country: 'Morocco'
+                    }
+                }
+            } 
+        } as unknown as Data );
+        const updatedDataEquiv = createSourceData();
+        updatedDataEquiv.history.places[ 2 ].city = 'Marakesh';
+        updatedDataEquiv.history.places[ 2 ].country = 'Morocco';
+        updatedDataEquiv.isActive = true;
+        expect( connection.get( ...sMap ) ).toEqual({
+            'history.places[2].city': 'Marakesh',
+            'history.places[2].country': 'Morocco',
+            'history.places[2].year': source.history.places[ 2 ].year,
+            isActive: true,
+            'tags[5]': source.tags[ 5 ],
+            'tags[6]': source.tags[ 6 ],
+            '@@GLOBAL': updatedDataEquiv
         });
         connection.disconnect();
     } );

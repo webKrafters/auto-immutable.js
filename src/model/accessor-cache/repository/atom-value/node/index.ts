@@ -116,7 +116,8 @@ class AtomNode<T extends Value>{
 			makeReadonly( this._rootAtomNode._sectionData );
 			return;
 		}
-		let data = this._rootAtomNode._sectionData as T;
+		const newSectionData = this._rootAtomNode._sectionData as T;
+		let data = newSectionData;
 		for( let keys = this._pathToRootAtom, kLen = keys.length, k = 0; k < kLen; k++ ) {
 			const key = keys[ k ];
 			if( !Object.isFrozen( data[ key ] ) ) {
@@ -125,7 +126,7 @@ class AtomNode<T extends Value>{
 			data = data[ key ] as T;
 		}
 		makeReadonly( data[ this._pathToRootAtom.at( -1 ) ] );
-		this._rootAtomNode._sectionData = data;
+		this._rootAtomNode._sectionData = newSectionData;
 	}
 
 	/**
