@@ -295,7 +295,7 @@ function distillChanges<T extends object>(
 	) ) {
 		let pathTokens = propertyPathMap[ path ];
 		paths.push( pathTokens as string[] );
-		changes = setProperty( changes, pathTokens, getProperty( source, pathTokens )._value );
+		changes = setProperty( changes, pathTokens, clonedeep( getProperty( source, pathTokens )._value ) );
 	}
 	return { changes, paths };
 }
