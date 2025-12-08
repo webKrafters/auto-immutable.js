@@ -658,7 +658,7 @@ describe( 'AtomNode class', () => {
 				testChanges = getChangeData();
 			} );
 			afterAll(() => { valueSetterSpy.mockRestore() });
-			test( 'sets atom at global selector wwhen available', () => {
+			test( 'sets atom at global selector when available', () => {
 				expect( root.key ).toBe( GLOBAL_SELECTOR );
 				expect( root.isActive ).toBe( false );
 				root.insertAtomAt(
@@ -668,9 +668,27 @@ describe( 'AtomNode class', () => {
 				);
 				expect( root.isActive ).toBe( true )
 				root.setValueAt([ GLOBAL_SELECTOR ], testChanges );
-				// called 1x for the newly created super sroot atom at GLOBAL_SELECTOR
+				// called 1x for the newly created super root atom at GLOBAL_SELECTOR
 				expect( valueSetterSpy ).toHaveBeenCalledTimes( 1 );
 				expect( valueSetterSpy ).toHaveBeenCalledWith( testChanges );
+			} );
+			test( 'embeds changes into active root node value object top-level property', () => {
+				const data = { ...getChangeData(), x: 0 };
+				root.insertAtomAt(
+					pathRepo.getPathInfoAt( GLOBAL_SELECTOR ).sanitizedPathId,
+					pathRepo,
+					data
+				);
+				root.setValueAt([ 'x' ], 24 as unknown as Data );
+				// called 1x for the newly created super root atom at GLOBAL_SELECTOR
+				expect( valueSetterSpy ).toHaveBeenCalledTimes( 1 );
+				expect( valueSetterSpy ).toHaveBeenCalledWith({ ...data, x: 24 });
+				valueSetterSpy.mockClear();
+				const y = { message: 'Testing new property' };
+				root.setValueAt([ 'y' ], y as unknown as Data );
+				// called 1x for the newly created super root atom at GLOBAL_SELECTOR
+				expect( valueSetterSpy ).toHaveBeenCalledTimes( 1 );
+				expect( valueSetterSpy ).toHaveBeenCalledWith({ ...data, x: 24, y });
 			} );
 			test( 'diseminates global selector change to individual section root atoms when global selector node has no atom', () => {
 				expect( root.key ).toBe( GLOBAL_SELECTOR );
