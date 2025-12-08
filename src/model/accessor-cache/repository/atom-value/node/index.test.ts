@@ -144,8 +144,7 @@ describe( 'AtomNode class', () => {
 					expect( Object.isFrozen( node.value ) ).toBe( true );
 					expect( isReadonly( node.rootAtomNode.value ) ).toBe( true );
 				} );
-				test( '1xxxxe', () => {
-				// test( 'ensures that unaffected atoms retain their original value object references', () => {
+				test( 'ensures that unaffected atoms retain their original value object references', () => {
 					const createTestUpdatePayload = ( currentState : Data ) : Data => {
 						let data = { ...currentState };
 						data = set( data, [ 't', 'u', 'v', 'd' ], 82 ) as Data;
@@ -647,7 +646,7 @@ describe( 'AtomNode class', () => {
 			let pathRepo : PathRepository;
 			beforeAll(() => {
 				valueSetterSpy = jest
-					.spyOn( AtomNode.prototype, 'safeValue', 'set' )
+					.spyOn( AtomNode.prototype, 'value', 'set' )
 					.mockImplementation();
 
 			} );
@@ -674,6 +673,8 @@ describe( 'AtomNode class', () => {
 				expect( valueSetterSpy ).toHaveBeenCalledWith( testChanges );
 			} );
 			test( 'embeds changes into active root node value object top-level property', () => {
+				valueSetterSpy.mockRestore();
+				valueSetterSpy = jest.spyOn( AtomNode.prototype, 'value', 'set' );
 				const data = { ...getChangeData(), x: 0 };
 				root.insertAtomAt(
 					pathRepo.getPathInfoAt( GLOBAL_SELECTOR ).sanitizedPathId,
@@ -690,6 +691,7 @@ describe( 'AtomNode class', () => {
 				// called 1x for the newly created super root atom at GLOBAL_SELECTOR
 				expect( valueSetterSpy ).toHaveBeenCalledTimes( 1 );
 				expect( valueSetterSpy ).toHaveBeenCalledWith({ ...data, x: 24, y });
+				valueSetterSpy.mockImplementation();
 			} );
 			test( 'diseminates global selector change to individual section root atoms when global selector node has no atom', () => {
 				expect( root.key ).toBe( GLOBAL_SELECTOR );

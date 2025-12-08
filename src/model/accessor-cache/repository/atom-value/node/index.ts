@@ -83,7 +83,7 @@ class AtomNode<T extends Value>{
 	 * @see value setter
 	 */
 	@activeNodesOnly
-	set safeValue( v : Readonly<T> ) {
+	set value( v : T ) {
 		const previousRootAtomValue = shallowCopy( this._rootAtomNode.value );
 		let isInit = false;
 		if( this.isRootAtom ) {
@@ -125,18 +125,6 @@ class AtomNode<T extends Value>{
 				this._pathToRootAtom
 			)._value as Readonly<T>;
 	}
-	/**
-	 * applicable only to nodes containing atoms: assert via a 
-	 * `this.isActive` check.
-	 * 
-	 * This value change propagates through descendant atoms. To
-	 * avoid redundant operations, it is advisable to call this
-	 * once on any node within a rootAtomNode section.
-	 * 
-	 * @param v
-	 */
-	@activeNodesOnly
-	set value( v : T ) { this.safeValue = makeReadonly( cloneDeep( v ) ) }
 
 	/**
 	 * applicable only to nodes containing atoms: assert via a `this.isActive` check.
@@ -205,11 +193,11 @@ class AtomNode<T extends Value>{
 		let node = this._findRoot();
 		if( fullPath[ 0 ] === GLOBAL_SELECTOR ) {
 			if( node.isActive ) {
-				node.safeValue = value;
+				node.value = value;
 				return;
 			}
 			for( let dNodes = node._findNearestActiveDescendants(), d = dNodes.length; d--; ) {
-				dNodes[ d ].safeValue = get( value, dNodes[ d ].fullPath )._value as T;
+				dNodes[ d ].value = get( value, dNodes[ d ].fullPath )._value as T;
 			}
 			return;
 		}
@@ -227,18 +215,18 @@ class AtomNode<T extends Value>{
 			for( let dNodes = node._findNearestActiveDescendants(), d = dNodes.length; d--; ) {
 				// istanbul ignore next
 				if( !dNodes[ d ].isRootAtom ) { continue }
-				dNodes[ d ].safeValue = get( value, dNodes[ d ].fullPath.slice( fullPathLen ) )._value as T;
+				dNodes[ d ].value = get( value, dNodes[ d ].fullPath.slice( fullPathLen ) )._value as T;
 			}
 			return;
 		}
 		const nodePathLen = activeNode.fullPath.length;
 		if( fullPathLen === nodePathLen ) {
-			activeNode.safeValue = activeNode.isRoot
+			activeNode.value = activeNode.isRoot
 				? set( activeNode.value, fullPath, value ) as T
 				: value;
 			return;
 		}
-		activeNode.safeValue = set(
+		activeNode.value = set(
 			activeNode.value,
 			fullPath.slice( nodePathLen ),
 			get( value, fullPath )._value
@@ -267,7 +255,9 @@ class AtomNode<T extends Value>{
 			this._pathToRootAtom = this.fullPath.slice( rootAtomNode.fullPath.length );
 			return;
 		}
-		this._sectionData = cloneDeep( this.isRoot ? origin : get( origin, this.fullPath )._value );
+		this._sectionData = makeReadonly( cloneDeep(
+			this.isRoot ? origin : get( origin, this.fullPath )._value
+		) );
 		this._notifyNearestActiveDescendantsOfNewRootAtom( this );
 		this._rootAtomNode = this;
 	}
@@ -405,6 +395,9 @@ class AtomNode<T extends Value>{
 
 	private _retainUnchangedDescendants( previousRootAtomValue : T ) {
 		const atomNode = this;
+		const sectionData = !atomNode.isRootAtom
+			? atomNode._rootAtomNode._sectionData
+			: atomNode._sectionData;
 		( function foundAndRestoredUnhanged<U>(
 			propValue : U,
 			prevValue : U,
@@ -431,15 +424,7 @@ class AtomNode<T extends Value>{
 				if( !_eq ) {
 					allEqual = false;
 				} else {
-						// istanbul ignore next
-					if( atomNode.isRootAtom ) {
-						atomNode._sectionData = set( atomNode._sectionData, path, prevVal ) as Readonly<T>;
-					} else {
-						// istanbul ignore next
-						atomNode._rootAtomNode._sectionData = set(
-							atomNode._rootAtomNode._sectionData, path, prevVal
-						) as Readonly<T>;
-					}
+					set( sectionData, path, prevVal ) as Readonly<T>;
 				}
 			}
 			return  allEqual;
