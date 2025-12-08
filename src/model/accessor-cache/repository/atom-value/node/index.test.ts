@@ -144,8 +144,7 @@ describe( 'AtomNode class', () => {
 					expect( Object.isFrozen( node.value ) ).toBe( true );
 					expect( isReadonly( node.rootAtomNode.value ) ).toBe( true );
 				} );
-				test( '1xxxxe', () => {
-				// test( 'ensures that unaffected atoms retain their original value object references', () => {
+				test( 'ensures that unaffected atoms retain their original value object references', () => {
 					const createTestUpdatePayload = ( currentState : Data ) : Data => {
 						let data = { ...currentState };
 						data = set( data, [ 't', 'u', 'v', 'd' ], 82 ) as Data;
