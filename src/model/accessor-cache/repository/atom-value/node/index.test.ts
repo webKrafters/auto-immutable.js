@@ -144,7 +144,8 @@ describe( 'AtomNode class', () => {
 					expect( Object.isFrozen( node.value ) ).toBe( true );
 					expect( isReadonly( node.rootAtomNode.value ) ).toBe( true );
 				} );
-				test( 'ensures that unaffected atoms retain their original value object references', () => {
+				test( '1xxxxe', () => {
+				// test( 'ensures that unaffected atoms retain their original value object references', () => {
 					const createTestUpdatePayload = ( currentState : Data ) : Data => {
 						let data = { ...currentState };
 						data = set( data, [ 't', 'u', 'v', 'd' ], 82 ) as Data;
@@ -646,7 +647,7 @@ describe( 'AtomNode class', () => {
 			let pathRepo : PathRepository;
 			beforeAll(() => {
 				valueSetterSpy = jest
-					.spyOn( AtomNode.prototype, 'value', 'set' )
+					.spyOn( AtomNode.prototype, 'safeValue', 'set' )
 					.mockImplementation();
 
 			} );

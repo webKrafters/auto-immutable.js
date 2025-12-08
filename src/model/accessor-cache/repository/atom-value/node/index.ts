@@ -75,28 +75,15 @@ class AtomNode<T extends Value>{
 	get key() { return this._key }
 	@activeNodesOnly
 	get rootAtomNode() { return this._rootAtomNode }
-	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
-	@activeNodesOnly
-	get value() : Readonly<T> {
-		return this.isRootAtom
-			? this._sectionData
-			: get(
-				this._rootAtomNode._sectionData,
-				this._pathToRootAtom
-			)._value as Readonly<T>;
-	}
 	/**
 	 * applicable only to nodes containing atoms: assert via a 
 	 * `this.isActive` check.
 	 * 
-	 * This value change propagates through descendant atoms. To
-	 * avoid redundant operations, it is advisable to call this
-	 * once on any node within a rootAtomNode section.
-	 * 
-	 * @param v
+	 * This only accepts Readonly value
+	 * @see value setter
 	 */
 	@activeNodesOnly
-	set value( v : T ) {
+	set safeValue( v : Readonly<T> ) {
 		const previousRootAtomValue = shallowCopy( this._rootAtomNode.value );
 		let isInit = false;
 		if( this.isRootAtom ) {
@@ -128,6 +115,28 @@ class AtomNode<T extends Value>{
 		makeReadonly( data[ this._pathToRootAtom.at( -1 ) ] );
 		this._rootAtomNode._sectionData = newSectionData;
 	}
+	/** applicable only to nodes containing atoms: assert via a `this.isActive` check. */
+	@activeNodesOnly
+	get value() : Readonly<T> {
+		return this.isRootAtom
+			? this._sectionData
+			: get(
+				this._rootAtomNode._sectionData,
+				this._pathToRootAtom
+			)._value as Readonly<T>;
+	}
+	/**
+	 * applicable only to nodes containing atoms: assert via a 
+	 * `this.isActive` check.
+	 * 
+	 * This value change propagates through descendant atoms. To
+	 * avoid redundant operations, it is advisable to call this
+	 * once on any node within a rootAtomNode section.
+	 * 
+	 * @param v
+	 */
+	@activeNodesOnly
+	set value( v : T ) { this.safeValue = makeReadonly( cloneDeep( v ) ) }
 
 	/**
 	 * applicable only to nodes containing atoms: assert via a `this.isActive` check.
@@ -196,11 +205,11 @@ class AtomNode<T extends Value>{
 		let node = this._findRoot();
 		if( fullPath[ 0 ] === GLOBAL_SELECTOR ) {
 			if( node.isActive ) {
-				node.value = value;
+				node.safeValue = value;
 				return;
 			}
 			for( let dNodes = node._findNearestActiveDescendants(), d = dNodes.length; d--; ) {
-				dNodes[ d ].value = get( value, dNodes[ d ].fullPath )._value as T;
+				dNodes[ d ].safeValue = get( value, dNodes[ d ].fullPath )._value as T;
 			}
 			return;
 		}
@@ -218,18 +227,18 @@ class AtomNode<T extends Value>{
 			for( let dNodes = node._findNearestActiveDescendants(), d = dNodes.length; d--; ) {
 				// istanbul ignore next
 				if( !dNodes[ d ].isRootAtom ) { continue }
-				dNodes[ d ].value = get( value, dNodes[ d ].fullPath.slice( fullPathLen ) )._value as T;
+				dNodes[ d ].safeValue = get( value, dNodes[ d ].fullPath.slice( fullPathLen ) )._value as T;
 			}
 			return;
 		}
 		const nodePathLen = activeNode.fullPath.length;
 		if( fullPathLen === nodePathLen ) {
-			activeNode.value = activeNode.isRoot
+			activeNode.safeValue = activeNode.isRoot
 				? set( activeNode.value, fullPath, value ) as T
 				: value;
 			return;
 		}
-		activeNode.value = set(
+		activeNode.safeValue = set(
 			activeNode.value,
 			fullPath.slice( nodePathLen ),
 			get( value, fullPath )._value
@@ -396,12 +405,9 @@ class AtomNode<T extends Value>{
 
 	private _retainUnchangedDescendants( previousRootAtomValue : T ) {
 		const atomNode = this;
-		const _sectionData = !atomNode.isRootAtom
-			? atomNode._rootAtomNode._sectionData
-			: atomNode._sectionData;
-		( function foundAndRestoredUnhanged<T>(
-			propValue : T,
-			prevValue : T,
+		( function foundAndRestoredUnhanged<U>(
+			propValue : U,
+			prevValue : U,
 			propPath : Array<string>
 		) {
 			if( isString( propValue ) ) { return propValue === prevValue }
@@ -425,7 +431,15 @@ class AtomNode<T extends Value>{
 				if( !_eq ) {
 					allEqual = false;
 				} else {
-					set( _sectionData, path, prevVal );
+						// istanbul ignore next
+					if( atomNode.isRootAtom ) {
+						atomNode._sectionData = set( atomNode._sectionData, path, prevVal ) as Readonly<T>;
+					} else {
+						// istanbul ignore next
+						atomNode._rootAtomNode._sectionData = set(
+							atomNode._rootAtomNode._sectionData, path, prevVal
+						) as Readonly<T>;
+					}
 				}
 			}
 			return  allEqual;

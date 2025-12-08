@@ -22,7 +22,7 @@ import { Immutable } from './main';
 
 import AccessorCache from './model/accessor-cache';
 
-export const deps = { noop: () => {}, setValue }
+export const deps = { noop: () => {}, setValue };
 
 export interface Source<T extends Value> {
     key: Immutable<T>,
