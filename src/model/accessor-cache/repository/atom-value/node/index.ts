@@ -224,7 +224,9 @@ class AtomNode<T extends Value>{
 		}
 		const nodePathLen = activeNode.fullPath.length;
 		if( fullPathLen === nodePathLen ) {
-			activeNode.value = value;
+			activeNode.value = activeNode.isRoot
+				? set( activeNode.value, fullPath, value ) as T
+				: value;
 			return;
 		}
 		activeNode.value = set(
