@@ -711,20 +711,17 @@ describe( 'AtomNode class', () => {
 				expect( valueSetterSpy ).not.toHaveBeenCalled();
 			} );
 			test( 'applies changes on paths not matching any atom path to the closest atom bearing ancestor', () => {
-				testChanges.a.b.c.d = {
-					...testChanges.a.b.c.d,
-					w: { x: { y: { z: {} } } }
-				} as typeof testChanges.a.b.c.d;
-				root.setValueAt( [ 'a', 'b', 'c', 'd' ], testChanges );
+				const changes = { z: {}  } as unknown as typeof testChanges;
+				root.setValueAt( [ 'a', 'b', 'c', 'd' ], changes );
 				// called 1x on the closest atom bearing ancestor (this for this change is located at path 'a.b.c')
 				expect( valueSetterSpy ).toHaveBeenCalledTimes( 1 );
-				expect( valueSetterSpy ).toHaveBeenCalledWith( testChanges.a.b.c );
+				expect( valueSetterSpy ).toHaveBeenCalledWith({ d: { z: {} } });
 			} );
 			test( 'applies changes directly to atom bearing nodes with matching paths', () => {
 				testChanges.a.b.c.d.e = {
 					...testChanges.a.b.c.d.e,
 					w: { x: { y: { z: {} } } }
-				} as typeof testChanges.a.b.c.d.e;
+				};
 				root.setValueAt(
 					[ 'a', 'b', 'c', 'd', 'e' ],
 					testChanges.a.b.c.d.e as unknown as Data
@@ -733,15 +730,12 @@ describe( 'AtomNode class', () => {
 				expect( valueSetterSpy ).toHaveBeenCalledTimes( 1 );
 				expect( valueSetterSpy ).toHaveBeenCalledWith( testChanges.a.b.c.d.e );
 			} );
-			test( 'merges changes occurring in leaf atom node subpaths to that leaf node', () => {
-				testChanges.a.f.g.h = {
-					...testChanges.a.f.g.h,
-					w: { x: { y: { z: {} } } }
-				};
-				root.setValueAt( [ 'a', 'f', 'g', 'h', 'w', 'x', 'y' ], testChanges );
+			test( 'places changes occurring in leaf atom node subpaths inside that leaf node', () => {
+				const changes = { z: {}  } as unknown as typeof testChanges;
+				root.setValueAt( [ 'a', 'f', 'g', 'h', 'w', 'x', 'y' ], changes );
 				// called 1x on the closest leaf atom node (this for this change is located at path 'a.f.g.h')
 				expect( valueSetterSpy ).toHaveBeenCalledTimes( 1 );
-				expect( valueSetterSpy ).toHaveBeenCalledWith( testChanges.a.f.g.h );
+				expect( valueSetterSpy ).toHaveBeenCalledWith({ w: { x: { y: { z: {} } } } });
 			} );
 			test( 'assigns to root atom nodes changes occurring at paths preceding above them', () => {
 				testChanges.q.r = {
