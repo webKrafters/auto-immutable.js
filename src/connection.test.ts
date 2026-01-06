@@ -190,6 +190,7 @@ describe( 'Connection class', () => {
         type Data = typeof source;
         const { connection } = setup( source );
         const sMap = [
+            'friends[1].name',
             'history.places[2].city',
             'history.places[2].country',
             'history.places[2].year',
@@ -199,6 +200,7 @@ describe( 'Connection class', () => {
             '@@GLOBAL'
         ];
         expect( connection.get( ...sMap ) ).toEqual({
+            'friends[1].name':  source.friends[ 1 ].name,
             'history.places[2].city': source.history.places[ 2 ].city,
             'history.places[2].country': source.history.places[ 2 ].country,
             'history.places[2].year': source.history.places[ 2 ].year,
@@ -209,6 +211,7 @@ describe( 'Connection class', () => {
         });
         connection.set({
             isActive: true,
+            friends: { 1: { name: { last: 'NEW LNAME' } } },
             history: {
                 places: {
                     2: {
@@ -219,14 +222,16 @@ describe( 'Connection class', () => {
             } 
         } as unknown as Data );
         const updatedDataEquiv = createSourceData();
+        updatedDataEquiv.friends[ 1 ].name.last = 'NEW LNAME';
         updatedDataEquiv.history.places[ 2 ].city = 'Marakesh';
         updatedDataEquiv.history.places[ 2 ].country = 'Morocco';
         updatedDataEquiv.isActive = true;
         expect( connection.get( ...sMap ) ).toEqual({
-            'history.places[2].city': 'Marakesh',
-            'history.places[2].country': 'Morocco',
+            'friends[1].name': updatedDataEquiv.friends[ 1 ].name,
+            'history.places[2].city': updatedDataEquiv.history.places[ 2 ].city,
+            'history.places[2].country': updatedDataEquiv.history.places[ 2 ].country,
             'history.places[2].year': source.history.places[ 2 ].year,
-            isActive: true,
+            isActive: updatedDataEquiv.isActive,
             'tags[5]': source.tags[ 5 ],
             'tags[6]': source.tags[ 6 ],
             '@@GLOBAL': updatedDataEquiv

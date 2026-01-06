@@ -183,7 +183,7 @@ class AtomNode<T extends Value>{
 	remove() { this.isLeaf ? this._destroy() : this._deactivate() }
 	
 	/**
-	 * This method allow user, from any node, to call set the value of an atom bearing node residing at or near the fullPath.\
+	 * This method allows user, from any node, to set the value of an atom bearing node residing at or near the fullPath.\
 	 * Not to be confused with the value setter property which must be called on an atom bearing node to assign it a new value.
 	 * 
 	 * @param {Array<string>} fullPath - the complete path tokens corresponding to the property location in the overall data object
@@ -229,7 +229,7 @@ class AtomNode<T extends Value>{
 		activeNode.value = set(
 			activeNode.value,
 			fullPath.slice( nodePathLen ),
-			get( value, fullPath )._value
+			value
 		) as T;
 	}
 	
