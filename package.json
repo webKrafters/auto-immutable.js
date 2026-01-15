@@ -73,5 +73,5 @@
     "test:watch": "jest --updateSnapshot --watchAll"
   },
   "types": "dist/index.d.ts",
-  "version": "2.0.0-rc.11"
+  "version": "2.0.0"
 }
