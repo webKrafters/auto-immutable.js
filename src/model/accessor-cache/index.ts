@@ -11,6 +11,7 @@ import Accessor from '../accessor';
 
 import PathRepository from './repository/paths';
 import AtomValueRepository from './repository/atom-value';
+import TimedMap from '@webkrafters/timed-map';
 
 class Sorted extends Array<number> {
 	push( item : number ) {
@@ -29,6 +30,8 @@ class Sorted extends Array<number> {
 
 class AccessorCache<T extends Value> {
 
+	private _accessorAgeTable : TimedMap<null>;
+
 	private _accessRegister : { [ regKey : string ]: Accessor<T> } = {};
 
 	/** A map of { source path id : Atom Value Node } */
@@ -45,6 +48,8 @@ class AccessorCache<T extends Value> {
 		this._valueRepo = new AtomValueRepository<T>(
 			origin, this._pathRepo
 		);
+		this._accessorAgeTable = new TimedMap<null>( 1.8e6 );
+		this._manageAccessorSenescence();
 	}
 
 	get origin() { return this._valueRepo.origin }
@@ -69,13 +74,17 @@ class AccessorCache<T extends Value> {
 		if( !propertyPaths.length ) { propertyPaths = [ GLOBAL_SELECTOR ] }
 		const { ids: pathIds, info } = this._toSourcePathInfo( propertyPaths );
 		const regKey = pathIds.join( ':' );
-		if( !( regKey in this._accessRegister ) ) {
+		if( regKey in this._accessRegister ) {
+			/* dummy call to restart accessor TTL */
+			this._accessorAgeTable.get( regKey );
+		} else {
 			this._accessRegister[ regKey ] = new Accessor<T>(
 				pathIds,
 				this._atomRegister,
 				this._pathRepo,
 				this._valueRepo
 			);
+			this._accessorAgeTable.put( regKey, null );
 		}
 		const accessor =  this._accessRegister[ regKey ];
 		!accessor.hasClient( clientId ) &&
@@ -93,8 +102,11 @@ class AccessorCache<T extends Value> {
 	unlinkClient( clientId : string ) {
 		const register = this._accessRegister;
 		for( const regKey in register ) {
-			register[ regKey ].removeClient( clientId );
-			if( register[ regKey ].numClients ) { continue }
+			const v = register[ regKey ];
+			if( !v.hasClient( clientId ) ) { continue }
+			v.removeClient( clientId );
+			if( v.numClients ) { continue }
+			this._accessorAgeTable.remove( regKey );
 			delete register[ regKey ];
 		}
 	}
@@ -111,6 +123,20 @@ class AccessorCache<T extends Value> {
 			observations.push( sourcePaths );
 		}
 		return observations;
+	}
+
+	private _manageAccessorSenescence() {
+		this._accessorAgeTable.on( 'PRUNED', data => {
+			const register = this._accessRegister;
+			for( const entry of data.data.removed ) {
+				const key = entry.key as string;
+				const accessor = register[ key ];
+				for( let cIds = accessor.clients, c = cIds.length; c--; ) {
+					accessor.removeClient( cIds[ c ] );
+				}
+				delete register[ key ];
+			}
+		} );
 	}
 
 	private _toSourcePathInfo( propertyPaths : Array<string> ) {

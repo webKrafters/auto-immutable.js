@@ -24,6 +24,9 @@ type Data = Value & {
 };
 
 describe( 'Connection class', () => { 
+    beforeAll(() => { jest.useFakeTimers() });
+    afterAll(() => { jest.useRealTimers() });
+    afterEach(() => { jest.clearAllTimers() });
     function setup<T extends {}>( originData : T = {} as T ) {
         const cache = new AccessorCache<T>( originData );
         const imDeps = require( './main' ).deps;

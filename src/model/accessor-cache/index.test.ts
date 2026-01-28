@@ -22,8 +22,20 @@ import { isReadonly } from '../../test-artifacts/utils';
 
 const Accessor = AccessorModule.default;
 
-describe( 'AccessorCache class', () => {
 
+class TestCache extends AccessorCache<{}> {
+	get numberOfAccessors() {
+		return Object.keys( this.accessRegister ).length;
+	}
+	public getAccessedPathGroupsBy( clientId : string ) {
+		return this. _getAccessedPathGroupsBy( clientId );
+	}
+}
+
+describe( 'AccessorCache class', () => {
+    beforeAll(() => { jest.useFakeTimers() });
+    afterAll(() => { jest.useRealTimers() });
+    afterEach(() => { jest.clearAllTimers() });
 	describe( 'atomize(...)', () => {
 		let cache : AccessorCache<{}>;
 		let mergeChangesSpy : jest.SpiedFunction<(
@@ -186,14 +198,6 @@ describe( 'AccessorCache class', () => {
 		} );
 	} );
 	describe( 'unlinkClient(...)', () => {
-		class TestCache extends AccessorCache<{}> {
-			get numberOfAccessors() {
-				return Object.keys( this.accessRegister ).length;
-			}
-			public getAccessedPathGroupsBy( clientId : string ) {
-				return this. _getAccessedPathGroupsBy( clientId );
-			}
-		}
 		let reachedFirstRun = false;
 		let cache : TestCache;
 		let removeClientSpy : jest.SpiedFunction<(clientId: string) => void>;
@@ -209,7 +213,7 @@ describe( 'AccessorCache class', () => {
 			cache = new TestCache({});
 		});
 		afterAll(() => removeClientSpy.mockRestore() );
-		test( `removes client from all existing accessors`, () => {
+		test( `removes client from all existing associated accessors`, () => {
 			const PATHS = [ 'a.v.c', 'a.c.e' ];
 			cache.get( 'REQUEST_1', ...PATHS, 'j.b.e' );
 			cache.get( 'REQUEST_2', ...PATHS );
@@ -220,13 +224,13 @@ describe( 'AccessorCache class', () => {
 			expect( removeClientSpy.mock.calls[ 1 ] ).toEqual([ 'REQUEST_1' ]);
 			removeClientSpy.mockClear();
 			cache.unlinkClient( 'REQUEST_1' );
-			expect( removeClientSpy ).toHaveBeenCalledTimes( 1 );
+			expect( removeClientSpy ).not.toHaveBeenCalled();
 			removeClientSpy.mockClear();
 			cache.unlinkClient( 'REQUEST_2' );
 			expect( removeClientSpy ).toHaveBeenCalledTimes( 1 );
 			expect( removeClientSpy.mock.calls[ 0 ] ).toEqual([ 'REQUEST_2' ]);
 		} );
-		test( `discards an accessor withh last client removal`, () => {
+		test( `discards an accessor with last client removal`, () => {
 			expect( cache.numberOfAccessors ).toBe( 0 );
 			const PATHS = [ 'a.v.c', 'a.c.e' ];
 			cache.get( 'REQUEST_1', ...PATHS, 'j.b.e' );
@@ -245,6 +249,108 @@ describe( 'AccessorCache class', () => {
 			expect( cache.numberOfAccessors ).toBe( 0 );
 			expect( cache.getAccessedPathGroupsBy( 'REQUEST_1' ) ).toHaveLength( 0 );
 			expect( cache.getAccessedPathGroupsBy( 'REQUEST_2' ) ).toHaveLength( 0 );
+		} );
+	} );
+	describe( 'accessor age management', () => {
+		const removeClientSpy = jest.spyOn( Accessor.prototype, 'removeClient' );
+		const setDeleteSpy = jest.spyOn( Set.prototype, 'delete' );
+		afterEach(() => {
+			removeClientSpy.mockClear();
+		});
+		afterAll(() => {
+			removeClientSpy.mockRestore();
+		});
+		test( 'unaccessed accessors are purged after 30 minutes', () => {
+			const accessedPathsA = [ 'a.b', 'c.c', 'z' ];
+			const accessedPathsB = [ 'b', 'z[0]' ];
+			const cache = new TestCache({});
+			
+			expect( cache.numberOfAccessors ).toBe( 0 );
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_1' ) ).toEqual([]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_2' ) ).toEqual([]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_3' ) ).toEqual([]);
+			
+			cache.get( 'CLIENT_1', ...accessedPathsA );
+			cache.get( 'CLIENT_2', ...accessedPathsA );
+			cache.get( 'CLIENT_3', ...accessedPathsA );
+			
+			expect( cache.numberOfAccessors ).toBe( 1 );
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_1' ) ).toEqual([ accessedPathsA ]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_2' ) ).toEqual([ accessedPathsA ]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_3' ) ).toEqual([ accessedPathsA ]);
+
+			cache.get( 'CLIENT_1', ...accessedPathsB );
+			cache.get( 'CLIENT_3', ...accessedPathsB );
+			
+			expect( cache.numberOfAccessors ).toBe( 2 );
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_1' ) ).toEqual([ accessedPathsB, accessedPathsA ]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_2' ) ).toEqual([ accessedPathsA ]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_3' ) ).toEqual([ accessedPathsB, accessedPathsA ]);
+
+			jest.advanceTimersByTime( 1.2e6 ); // 20 minutes
+			/* accessing the accessor for `accessedPathB` @ the 20th second */
+			cache.get( 'CLIENT 1', ...accessedPathsB );
+			expect( removeClientSpy ).not.toHaveBeenCalled();
+			
+			expect( cache.numberOfAccessors ).toBe( 2 );
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_1' ) ).toEqual([ accessedPathsB, accessedPathsA ]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_2' ) ).toEqual([ accessedPathsA ]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_3' ) ).toEqual([ accessedPathsB, accessedPathsA ]);
+
+			jest.advanceTimersByTime( 7e5 ); // 10+ more minutes later
+			/* disassociates all clients at the unused accessed path and discards the accessor */ 
+			expect( removeClientSpy ).toHaveBeenCalledTimes( 3 );
+			
+			expect( cache.numberOfAccessors ).toBe( 1 );
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_1' ) ).toEqual([ accessedPathsB ]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_2' ) ).toEqual([]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_3' ) ).toEqual([ accessedPathsB ]);
+		} );
+		test( 'will automatically create a new accessor for previously purged path if accessed', () => {
+			const accessedPathsA = [ 'a.b', 'c.c', 'z' ];
+			const accessedPathsB = [ 'b', 'z[0]' ];
+			const cache = new TestCache({});
+			cache.get( 'CLIENT_1', ...accessedPathsA );
+			cache.get( 'CLIENT_2', ...accessedPathsA );
+			cache.get( 'CLIENT_3', ...accessedPathsA );
+			cache.get( 'CLIENT_1', ...accessedPathsB );
+			cache.get( 'CLIENT_3', ...accessedPathsB );
+			
+			expect( cache.numberOfAccessors ).toBe( 2 );
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_1' ) ).toEqual([ accessedPathsB, accessedPathsA ]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_2' ) ).toEqual([ accessedPathsA ]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_3' ) ).toEqual([ accessedPathsB, accessedPathsA ]);
+
+			jest.advanceTimersByTime( 1.2e6 ); // 20 minutes
+			/* accessing the accessor for `accessedPathB` @ the 20th second */
+			cache.get( 'CLIENT 1', ...accessedPathsA );
+			expect( removeClientSpy ).not.toHaveBeenCalled();
+
+			jest.advanceTimersByTime( 7e5 ); // 10+ more minutes later
+			/* disassociates all clients at the unused accessed path and discards the accessor */ 
+			expect( removeClientSpy ).toHaveBeenCalledTimes( 2 );
+			removeClientSpy.mockClear();
+			
+			expect( cache.numberOfAccessors ).toBe( 1 );
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_1' ) ).toEqual([ accessedPathsA ]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_2' ) ).toEqual([ accessedPathsA ]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_3' ) ).toEqual([ accessedPathsA ]);
+
+			/* RE-INSTATING ACCESSOR AT `accessedPathB` */
+			cache.get( 'CLIENT_2', ...accessedPathsB );
+			
+			expect( cache.numberOfAccessors ).toBe( 2 );
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_1' ) ).toEqual([ accessedPathsA ]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_2' ) ).toEqual([ [ 'z[0]', 'b' ] /* weird rearrangement of `accessedPathsB` */, accessedPathsA ]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_3' ) ).toEqual([ accessedPathsA ]);
+
+			/* PURGE ALL ACCESSORS WHEN NONE USED FOR MORE THAN 30 MINUTES */
+			jest.advanceTimersByTime( 2e6 ); // 30+ minutes
+
+			expect( cache.numberOfAccessors ).toBe( 0 );
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_1' ) ).toEqual([]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_2' ) ).toEqual([]);
+			expect( cache.getAccessedPathGroupsBy( 'CLIENT_3' ) ).toEqual([]);
 		} );
 	} );
 } );	
