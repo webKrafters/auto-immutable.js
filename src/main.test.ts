@@ -10,9 +10,6 @@ import { Connection } from './connection';
 import { Closable, Immutable } from './main';
 
 describe( 'Immutable class', () => {
-    beforeAll(() => { jest.useFakeTimers() });
-    afterAll(() => { jest.useRealTimers() });
-    afterEach(() => { jest.clearAllTimers() });
     describe( 'identity', () => {
         let immutable : Immutable<{}>;
         beforeAll(() => { immutable = new Immutable({}) });
@@ -24,6 +21,8 @@ describe( 'Immutable class', () => {
         } );
     } );
     test( 'An immutable instance can be updated by any of its connections', () => {
+        jest.useFakeTimers();
+        
         const path = 'test.2';
         const value = {};
 
@@ -66,6 +65,8 @@ describe( 'Immutable class', () => {
 
         expect( conn10.get( path )[ path ] ).toEqual( 'Y' );
         expect( conn11.get( path )[ path ] ).toEqual( 'Y' );
+
+        jest.useRealTimers();
     });
     test( 'can monitor its closing event', () => {
         const im = new Immutable({});
