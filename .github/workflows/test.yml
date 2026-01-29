@@ -25,7 +25,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           
-      - run: npm install --package-lock-only
+      - run: npm installs
       - run: npm ci
       - run: npm run test:core -- --coverage
 
