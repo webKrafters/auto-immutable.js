@@ -21,6 +21,8 @@ describe( 'Immutable class', () => {
         } );
     } );
     test( 'An immutable instance can be updated by any of its connections', () => {
+        jest.useFakeTimers();
+        
         const path = 'test.2';
         const value = {};
 
@@ -63,7 +65,9 @@ describe( 'Immutable class', () => {
 
         expect( conn10.get( path )[ path ] ).toEqual( 'Y' );
         expect( conn11.get( path )[ path ] ).toEqual( 'Y' );
-    } );
+
+        jest.useRealTimers();
+    });
     test( 'can monitor its closing event', () => {
         const im = new Immutable({});
         const closeListener = jest.fn();

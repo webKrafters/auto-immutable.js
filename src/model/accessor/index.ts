@@ -32,6 +32,8 @@ class Accessor <T extends Value> {
 		this._valueRepo = valueRepo;
 	}
 
+	get clients() { return [ ...this._clients ] }
+
 	get id() { return this._id }
 
 	get numClients() { return this._clients.size }

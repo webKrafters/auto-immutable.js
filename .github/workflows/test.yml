@@ -24,9 +24,10 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
-          
-      - run: npm install --package-lock-only
-      - run: npm ci
+
+      - run: rm -rf node_modules
+      - run: rm package-lock.json
+      - run: npm install
       - run: npm run test:core -- --coverage
 
       - uses: coverallsapp/github-action@master

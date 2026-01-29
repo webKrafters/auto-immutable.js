@@ -53,6 +53,8 @@ describe( 'Connection class', () => {
         let updateTest : {[x:string]:any} = {};
         let protectedData : Data;
         beforeAll(() => {
+            jest.useFakeTimers();
+            
             const { cache, connection, teardown } = setup();
 
             const propertyPaths = [ 'valid', 'b.message' ];
@@ -98,7 +100,9 @@ describe( 'Connection class', () => {
                 && v[ 'b.message' ] as unknown as string === protectedData.b.message
                 && v.valid as unknown as boolean === protectedData.valid;
 
-           teardown();
+            jest.useRealTimers();
+
+            teardown();
         } );
         test(
             'gets from cache value(s) located at properyPath(s)',
@@ -117,6 +121,7 @@ describe( 'Connection class', () => {
             () => { expect( passedUpdateCompleteNotifiedTest ).toBe( true ) }
         );
         test( 'GLOBAL_SELECTOR returns a copy of the entire immutable object', () => {
+            jest.useFakeTimers();
             const { connection } = setup();
             const changes = clonedeep( protectedData );
             connection.set( changes );
@@ -125,6 +130,7 @@ describe( 'Connection class', () => {
             )[ GLOBAL_SELECTOR ];
             expect( gsData ).toStrictEqual( changes );
             expect( gsData ).not.toBe( changes );
+            jest.useRealTimers()
         } );
     } );
     describe( 'disconnection', () => {

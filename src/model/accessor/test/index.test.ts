@@ -48,8 +48,36 @@ describe( 'Accessor class', () => {
 				new AtomValueRepository( {}, pathRepo )
 			);
 		} );
+		describe( 'clients', () => {
+			test( "will produce an array of all clients' descriptors associated", () => {
+				const createAtomNode = getFakeAtomNodeFactory();
+				const pathRepo = new PathRepository();
+				const accessor = new Accessor(
+					sourceIds,
+					{
+						1: createAtomNode( '1' ),
+						2: createAtomNode( '2' ),
+						3: createAtomNode( '3' ),
+						4: createAtomNode( '4' )
+					},
+					pathRepo,
+					new AtomValueRepository( {}, pathRepo )
+				);
+				expect( accessor.clients ).toStrictEqual([]);
+				accessor.addClient( 'TEST_1' );
+				expect( accessor.clients ).toStrictEqual([ 'TEST_1' ]);
+				accessor.addClient( 'TEST_2' );
+				expect( accessor.clients ).toStrictEqual([ 'TEST_1', 'TEST_2' ]);
+				accessor.addClient( 'TEST_1' ); // no change
+				expect( accessor.clients ).toStrictEqual([ 'TEST_1', 'TEST_2' ]);
+				accessor.addClient( 'TEST_3' );
+				expect( accessor.clients ).toStrictEqual([ 'TEST_1', 'TEST_2', 'TEST_3' ]);
+				accessor.removeClient( 'TEST_2' );
+				expect( accessor.clients ).toStrictEqual([ 'TEST_1', 'TEST_3' ]);
+			} );
+		} );
 		describe( 'id', () => {
-			test( 'will produce the internal for this accessor', () => {
+			test( 'will produce the internal id for this accessor', () => {
 				expect( accessor.id ).toEqual( expect.any( Number ) );
 			} );
 		} );
@@ -72,6 +100,8 @@ describe( 'Accessor class', () => {
 				accessor.addClient( 'TEST_1' );
 				expect( accessor.numClients ).toEqual( 1 );
 				accessor.addClient( 'TEST_2' );
+				expect( accessor.numClients ).toEqual( 2 );
+				accessor.addClient( 'TEST_1' ); // no change
 				expect( accessor.numClients ).toEqual( 2 );
 				accessor.addClient( 'TEST_3' );
 				expect( accessor.numClients ).toEqual( 3 );
