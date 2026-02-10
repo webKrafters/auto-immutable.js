@@ -219,18 +219,16 @@ class AtomNode<T extends Value>{
 			}
 			return;
 		}
-		const nodePathLen = activeNode.fullPath.length;
-		if( fullPathLen === nodePathLen ) {
-			activeNode.value = activeNode.isRoot
-				? set( activeNode.value, fullPath, value ) as T
-				: value;
+		if( activeNode.isRoot ) {
+			activeNode.value = set( activeNode.value, fullPath, value ) as T;
 			return;
 		}
-		activeNode.value = set(
-			activeNode.value,
-			fullPath.slice( nodePathLen ),
-			value
-		) as T;
+		const nodePathLen = activeNode.fullPath.length;
+		if( fullPathLen !== nodePathLen ) {
+			activeNode.value = set( activeNode.value, fullPath.slice( nodePathLen ), value ) as T;
+			return;
+		}
+		activeNode.value = value;
 	}
 	
 	/**
