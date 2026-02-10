@@ -8,7 +8,7 @@ import {
 
 import isEqual from 'lodash.isequal';
 
-import { GLOBAL_SELECTOR, type Value } from './';
+import { DELETE_TAG, GLOBAL_SELECTOR, MOVE_TAG, type Value } from './';
 
 import AccessorCache from './model/accessor-cache';
 import { Immutable } from './main';
@@ -60,6 +60,8 @@ describe( 'Connection class', () => {
             const propertyPaths = [ 'valid', 'b.message' ];
             
             let d = connection.get( ...propertyPaths );
+            jest.runAllTimers();
+
             passedNoneFoundTest =
                 Object.keys( d ).length === 2
                     && d[ 'b.message' ] === undefined
@@ -94,6 +96,7 @@ describe( 'Connection class', () => {
             }
 
             const v = connection.get( ...propertyPaths );
+            jest.runAllTimers();
 
             passedFoundTest =
                 Object.keys( v ).length === 2
@@ -128,15 +131,24 @@ describe( 'Connection class', () => {
             const gsData = connection.get(
                 GLOBAL_SELECTOR, 'a', 'valid'
             )[ GLOBAL_SELECTOR ];
+            jest.runAllTimers();
             expect( gsData ).toStrictEqual( changes );
             expect( gsData ).not.toBe( changes );
-            jest.useRealTimers()
+            jest.useRealTimers();
         } );
+        test( 'fetches the GLOBAL_SELECTOR path by default', () => {
+            jest.useFakeTimers();
+            expect( setup( clonedeep( protectedData ) ).connection.get() ).toEqual({[ GLOBAL_SELECTOR ]: protectedData });
+            jest.runAllTimers();
+            jest.useRealTimers();
+        });
     } );
     describe( 'disconnection', () => {
         test(
             'discards internally held refs and sets `disconnected` flag',
             () => {
+                jest.useFakeTimers();
+
                 const { cache, connection, teardown } = setup();
 
                 const cacheGetSpy = jest
@@ -147,6 +159,7 @@ describe( 'Connection class', () => {
                     .mockReturnValue( undefined );
 
                 connection.get( expect.any( Array ) as unknown as string );
+                jest.runAllTimers();
                 expect( cacheGetSpy ).toHaveBeenCalledTimes( 1 );
                 connection.set( {} );
                 expect( setSpy ).toHaveBeenCalledTimes( 1 );
@@ -161,6 +174,8 @@ describe( 'Connection class', () => {
                 expect( cacheGetSpy ).not.toHaveBeenCalled();
                 connection.set( {} );
                 expect( setSpy ).not.toHaveBeenCalled();
+
+                jest.useRealTimers();
 
                 jest.restoreAllMocks();
         
@@ -192,6 +207,7 @@ describe( 'Connection class', () => {
         );
     } );
     test( 'runs full fetch on complex paths', () => {
+        jest.useFakeTimers();
         const source = createSourceData();
         type Data = typeof source;
         const { connection } = setup( source );
@@ -215,6 +231,7 @@ describe( 'Connection class', () => {
             'tags[6]': source.tags[ 6 ],
             '@@GLOBAL': source
         });
+        jest.runAllTimers();
         connection.set({
             isActive: true,
             friends: { 1: { name: { last: 'NEW LNAME' } } },
@@ -242,12 +259,54 @@ describe( 'Connection class', () => {
             'tags[6]': source.tags[ 6 ],
             '@@GLOBAL': updatedDataEquiv
         });
+        jest.runAllTimers();
+        jest.useRealTimers();
         connection.disconnect();
     } );
+    test( 'handles deep value computed update requests', () => {
+        jest.useFakeTimers();
+         
+        const source = createSourceData();
+        type Data = typeof source;
+        const { connection } = setup( source );
+
+        expect( connection.get() ).toEqual({[ GLOBAL_SELECTOR ]: source });
+        jest.runAllTimers();
+        
+        connection.set({
+            friends: { [ MOVE_TAG ]: [ -1, 1 ] },
+            isActive: true,
+            history: {
+                places: {
+                    '2': {
+                        city: 'Marakesh',
+                        country: 'Morocco'
+                    } as unknown as Data["history"]["places"][0]
+                } as unknown as Data["history"]["places"]
+            },
+            tags: { [ DELETE_TAG ]: [ 3, 5 ] }
+        } as unknown as Data );
+        const defaultState = createSourceData();
+        const expectedValue = { ...defaultState };
+        expectedValue.friends = [ 0, 2, 1 ].map( i => defaultState.friends[ i ] );
+        expectedValue.history.places[ 2 ].city = 'Marakesh';
+        expectedValue.history.places[ 2 ].country = 'Morocco';
+        expectedValue.isActive = true;
+        expectedValue.tags = [ 0, 1, 2, 4, 6 ].map( i => defaultState.tags[ i ] );
+
+        expect( connection.get() ).toEqual({[ GLOBAL_SELECTOR ]: expectedValue });
+        jest.runAllTimers();
+
+        connection.disconnect();
+
+        jest.useRealTimers();
+						
+    } );
     test( 'handles atoms sharing', () => {
+        jest.useFakeTimers();
         const source = createSourceData();
         const { connection } = setup( source );
-        connection.get(
+        const data1 = connection.get(
             'history.places[2].city',
             'history.places[2].country',
             'history.places[2].year',
@@ -256,6 +315,7 @@ describe( 'Connection class', () => {
             'tags[6]',
             '@@GLOBAL'
         );
+        jest.runAllTimers();
         const data2 = connection.get(
             'friends[1].name.last',
             'history.places[2].country',
@@ -263,6 +323,16 @@ describe( 'Connection class', () => {
             'company',
             'tags[5]',
         );
+        jest.runAllTimers();
+        expect( data1 ).toEqual({
+            'history.places[2].city': source.history.places[ 2 ].city,
+            'history.places[2].country': source.history.places[ 2 ].country,
+            'history.places[2].year': source.history.places[ 2 ].year,
+            'isActive': source.isActive,
+            'tags[5]': source.tags[ 5 ],
+            'tags[6]': source.tags[ 6 ],
+            '@@GLOBAL': source
+        });
         expect( data2 ).toEqual({
             'friends[1].name.last': source.friends[ 1 ].name.last,
             'history.places[2].country': source.history.places[ 2 ].country,
@@ -271,5 +341,6 @@ describe( 'Connection class', () => {
             'tags[5]': source.tags[ 5 ],
         });
         connection.disconnect();
+        jest.useRealTimers();
     } );
 } );

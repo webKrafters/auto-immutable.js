@@ -67,6 +67,7 @@ export class Connection<T extends Value> {
         this._source = undefined;
     }
 
+    /** @param - defaults to the `GLOBAL_SELECTOR` via the `accessorCache.get` method */
     @invoke
     get( ...propertyPaths : Array<string> ) {
         return this._source.map
