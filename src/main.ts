@@ -39,18 +39,15 @@ export class Closable {
 
     @invoke
     close() {
-        this._listeners.forEach( f => f() )
+        this._listeners.forEach( fn => fn() );
+        this._listeners.clear();
         this._closed = true;
     }
 
     @invoke
     onClose( fn : Fn ) {
-        const _fn = () => {
-            fn();
-            this.offClose( _fn );
-        }
-        this._listeners.add( _fn );
-        return () => this.offClose( _fn );
+        this._listeners.add( fn );
+        return () => this.offClose( fn );
     }
 
     @invoke

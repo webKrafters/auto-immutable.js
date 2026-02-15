@@ -78,6 +78,7 @@ describe( 'Immutable class', () => {
         expect( closeListener ).toHaveBeenCalledWith();
     } );
     test( 'can stop monitoring its closing event', () => {
+        // 1. by using returned unsubscribed function
         const im = new Immutable({});
         const closeListener = jest.fn();
         const stopWatching = im.onClose( closeListener );
@@ -85,6 +86,14 @@ describe( 'Immutable class', () => {
         stopWatching();
         im.close();
         expect( closeListener ).not.toHaveBeenCalled();
+        // 2. `by directly unsubscribing from the close event
+        const im1 = new Immutable({});
+        const closeListener1 = jest.fn();
+        im1.onClose( closeListener1 );
+        expect( closeListener1 ).not.toHaveBeenCalled();
+        im1.offClose( closeListener1 );
+        im1.close();
+        expect( closeListener1 ).not.toHaveBeenCalled();
     } );
     test( 'disconnects all of its currently held connections on close', () => {
         const NUM_CONNECTIONS = 4;
