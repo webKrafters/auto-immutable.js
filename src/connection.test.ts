@@ -142,7 +142,7 @@ describe( 'Connection class', () => {
             jest.runAllTimers();
             jest.useRealTimers();
         } );
-        test( 'in isolation, maintains communication with the context', () => {
+        test( 'monitors update changes on both global and targeted data retrievals', () => {
             jest.useFakeTimers();
             const a = setup();
             expect( a.connection.get() ).toEqual({
