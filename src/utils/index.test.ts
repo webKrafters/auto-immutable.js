@@ -89,54 +89,6 @@ describe( 'utils module', () => {
 			} );
 		} );
 	} );
-	describe( 'isAPrefixOfB(...)', () => {
-		test( 'rejects different series of equal lengths', () => {
-			expect( utils.isAPrefixOfB(
-				[ 'a', 'b', 'c' ],
-				[ 'a', 'c', 'v' ]
-			) ).toBe( false );
-		} );
-		test( 'accepts two equal series', () => {
-			expect( utils.isAPrefixOfB(
-				[ 'a', 'b', 'c' ],
-				[ 'a', 'b', 'c' ]
-			) ).toBe( true );
-			expect( utils.isAPrefixOfB(
-				[],
-				[]
-			) ).toBe( true );
-		} );
-		test( 'accepts series A containing the first N shorter subsequence of series B', () => {
-			expect( utils.isAPrefixOfB(
-				[],
-				[ 'a', 'b', 'c', 'd', 'e','f' ]
-			) ).toBe( true );
-			expect( utils.isAPrefixOfB(
-				[ 'a', 'b', 'c' ],
-				[ 'a', 'b', 'c', 'd', 'e','f' ]
-			) ).toBe( true );
-		} );
-		test( 'rejects series A containing non first N shorter subsequence of series B', () => {
-			expect( utils.isAPrefixOfB(
-				[ 'c', 'd', 'e' ],
-				[ 'a', 'b', 'c', 'd', 'e','f' ]
-			) ).toBe( false );
-			expect( utils.isAPrefixOfB(
-				[ 'a', 'y', 'c' ],
-				[ 'a', 'b', 'c', 'd', 'e','f' ]
-			) ).toBe( false );
-		} );
-		test( 'rejects series A containing the entire series B and more', () => {
-			expect( utils.isAPrefixOfB(
-				[ 'a', 'b', 'c', 'd', 'e','f' ],
-				[]
-			) ).toBe( false );
-			expect( utils.isAPrefixOfB(
-				[ 'a', 'b', 'c', 'd', 'e','f' ],
-				[ 'a', 'b', 'c' ]
-			) ).toBe( false );
-		} );
-	} );
 	describe( 'isDataContainer(...)', () => {
 		test( 'is true for arrays', () => {
 			expect( utils.isDataContainer( [] ) ).toBe( true );

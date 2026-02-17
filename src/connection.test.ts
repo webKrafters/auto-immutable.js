@@ -141,7 +141,43 @@ describe( 'Connection class', () => {
             expect( setup( clonedeep( protectedData ) ).connection.get() ).toEqual({[ GLOBAL_SELECTOR ]: protectedData });
             jest.runAllTimers();
             jest.useRealTimers();
-        });
+        } );
+        test( 'in isolation, maintains communication with the context', () => {
+            jest.useFakeTimers();
+            const a = setup();
+            expect( a.connection.get() ).toEqual({
+                [ GLOBAL_SELECTOR ]: {}
+            });
+            jest.runAllTimers();
+            a.connection.set({ b: 22 });
+            expect( a.connection.get( 'a' ) ).toEqual({ a: undefined });
+			jest.runAllTimers();
+            expect( a.connection.get( 'a', 'b' ) ).toEqual({
+                b: 22,
+                a: undefined
+            });
+            jest.runAllTimers();
+            expect( a.connection.get() ).toEqual({
+                [ GLOBAL_SELECTOR ]: { b: 22 }
+            });
+            jest.runAllTimers();
+            a.connection.set({ a: 1024 });
+            expect( a.connection.get( 'a' ) ).toEqual({ a: 1024 });
+			jest.runAllTimers();
+            expect( a.connection.get( 'b', 'a' ) ).toEqual({
+                b: 22,
+                a: 1024
+            });
+            jest.runAllTimers();
+            expect( a.connection.get() ).toEqual({
+                [ GLOBAL_SELECTOR ]: {
+                    a: 1024,
+					b: 22
+                }
+            });
+            jest.runAllTimers();
+            jest.useRealTimers();
+        } );
     } );
     describe( 'disconnection', () => {
         test(

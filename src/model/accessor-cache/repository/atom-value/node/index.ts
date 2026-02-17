@@ -11,7 +11,6 @@ import cloneDeep from '@webkrafters/clone-total';
 import { GLOBAL_SELECTOR } from '../../../../..';
 
 import {
-	isAPrefixOfB,
 	isPlainObject,
 	isString,
 	makeReadonly,
@@ -152,6 +151,9 @@ class AtomNode<T extends Value>{
 				pathRepo
 			}, origin );
 		}
+        if( node.isActive ) {
+          return node._addActiveDescendantNodeAt( sanitizedPathId );
+        }
 		let key : KeyType;
 		for( let tLen = fullPath.length - 1, t = 0; t < tLen; t++ ) {
 			key = fullPath[ t ];
@@ -250,7 +252,7 @@ class AtomNode<T extends Value>{
 		this._fullPathId = dottedPathId;
 		if( rootAtomNode !== null ) { // for creating an active descedant atom node
 			this._rootAtomNode = rootAtomNode;
-			this._pathToRootAtom = this.fullPath.slice( rootAtomNode.fullPath.length );
+			this._pathToRootAtom = computePathToDestination( rootAtomNode, this.fullPath );
 			return;
 		}
 		this._sectionData = makeReadonly( cloneDeep(
@@ -271,7 +273,7 @@ class AtomNode<T extends Value>{
 		const fullPath = this._fullPathRepo.getPathTokensAt( sanitizedPathId );
 		let node = this.rootAtomNode;
 		for(
-			let pathToRootAtom = fullPath.slice( this.fullPath.length ),
+			let pathToRootAtom = computePathToDestination( this, fullPath ),
 				ancestorLen =  pathToRootAtom.length - 1,
 				p = 0;
 			p < ancestorLen;
@@ -300,9 +302,7 @@ class AtomNode<T extends Value>{
 
 	private _adjustToNewRootAtom( newRootAtomNode : AtomNode<T> ) {
 		this._rootAtomNode = newRootAtomNode;
-		this._pathToRootAtom = newRootAtomNode.key !== GLOBAL_SELECTOR
-			? this.fullPath.slice( newRootAtomNode.fullPath.length )
-			: this.fullPath;
+		this._pathToRootAtom = computePathToDestination( newRootAtomNode, this.fullPath );
 		this._notifyNearestActiveDescendantsOfNewRootAtom( newRootAtomNode );
 	}
 
@@ -435,6 +435,15 @@ class AtomNode<T extends Value>{
 }
 
 export default AtomNode;
+
+function computePathToDestination<T extends Value>(
+	startNode : AtomNode<T>,
+	destFullPath : Array<string>
+) {
+	return !startNode.isRoot
+		? destFullPath.slice( startNode.fullPath.length )
+		: destFullPath;
+}
 
 function activeNodesOnly<C>( method: Function, context: C ) {
     return function ( this: AtomNode<any>, ...args: Array<any> ) {
