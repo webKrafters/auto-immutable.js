@@ -60,8 +60,7 @@ describe( 'Connection class', () => {
             const propertyPaths = [ 'valid', 'b.message' ];
             
             let d = connection.get( ...propertyPaths );
-            jest.runAllTimers();
-
+            
             passedNoneFoundTest =
                 Object.keys( d ).length === 2
                     && d[ 'b.message' ] === undefined
@@ -96,8 +95,7 @@ describe( 'Connection class', () => {
             }
 
             const v = connection.get( ...propertyPaths );
-            jest.runAllTimers();
-
+            
             passedFoundTest =
                 Object.keys( v ).length === 2
                 && v[ 'b.message' ] as unknown as string === protectedData.b.message
@@ -131,7 +129,7 @@ describe( 'Connection class', () => {
             const gsData = connection.get(
                 GLOBAL_SELECTOR, 'a', 'valid'
             )[ GLOBAL_SELECTOR ];
-            jest.runAllTimers();
+            
             expect( gsData ).toStrictEqual( changes );
             expect( gsData ).not.toBe( changes );
             jest.useRealTimers();
@@ -139,7 +137,6 @@ describe( 'Connection class', () => {
         test( 'fetches the GLOBAL_SELECTOR path by default', () => {
             jest.useFakeTimers();
             expect( setup( clonedeep( protectedData ) ).connection.get() ).toEqual({[ GLOBAL_SELECTOR ]: protectedData });
-            jest.runAllTimers();
             jest.useRealTimers();
         } );
         test( 'monitors update changes on both global and targeted data retrievals', () => {
@@ -148,34 +145,59 @@ describe( 'Connection class', () => {
             expect( a.connection.get() ).toEqual({
                 [ GLOBAL_SELECTOR ]: {}
             });
-            jest.runAllTimers();
             a.connection.set({ b: 22 });
             expect( a.connection.get( 'a' ) ).toEqual({ a: undefined });
-			jest.runAllTimers();
-            expect( a.connection.get( 'a', 'b' ) ).toEqual({
+			expect( a.connection.get( 'a', 'b' ) ).toEqual({
                 b: 22,
                 a: undefined
             });
-            jest.runAllTimers();
             expect( a.connection.get() ).toEqual({
                 [ GLOBAL_SELECTOR ]: { b: 22 }
             });
-            jest.runAllTimers();
             a.connection.set({ a: 1024 });
             expect( a.connection.get( 'a' ) ).toEqual({ a: 1024 });
-			jest.runAllTimers();
-            expect( a.connection.get( 'b', 'a' ) ).toEqual({
+			expect( a.connection.get( 'b', 'a' ) ).toEqual({
                 b: 22,
                 a: 1024
             });
-            jest.runAllTimers();
             expect( a.connection.get() ).toEqual({
                 [ GLOBAL_SELECTOR ]: {
                     a: 1024,
 					b: 22
                 }
             });
-            jest.runAllTimers();
+            jest.useRealTimers();
+        } );
+        test( 'updates a request cache slice from a subset of a larger incoming value', () => {
+            jest.useFakeTimers();
+            const sourceData = createSourceData();
+            const a = setup( sourceData );
+            const propertyPath = 'registered.time.hours';
+            expect( a.connection.get( propertyPath ) )
+                .toEqual({ [ propertyPath ]: 9 });
+            a.connection.set({
+                registered: {
+                    month: 7,
+                    time: {
+                        hours: 22,
+                        minutes: 5
+                    },
+                    year: 2026
+                } as typeof sourceData["registered"]
+            });
+            expect( a.connection.get( propertyPath ) )
+                .toEqual({ [ propertyPath ]: 22 });
+            a.connection.set({
+                registered: {
+                    month: 3,
+                    time: {
+                        hours: 16
+                    }
+                } as typeof sourceData["registered"]
+            });
+            expect( a.connection.get( propertyPath ) )
+                .toEqual({ [ propertyPath ]: 16 });
+
             jest.useRealTimers();
         } );
     } );
@@ -195,7 +217,6 @@ describe( 'Connection class', () => {
                     .mockReturnValue( undefined );
 
                 connection.get( expect.any( Array ) as unknown as string );
-                jest.runAllTimers();
                 expect( cacheGetSpy ).toHaveBeenCalledTimes( 1 );
                 connection.set( {} );
                 expect( setSpy ).toHaveBeenCalledTimes( 1 );
@@ -267,7 +288,6 @@ describe( 'Connection class', () => {
             'tags[6]': source.tags[ 6 ],
             '@@GLOBAL': source
         });
-        jest.runAllTimers();
         connection.set({
             isActive: true,
             friends: { 1: { name: { last: 'NEW LNAME' } } },
@@ -295,7 +315,6 @@ describe( 'Connection class', () => {
             'tags[6]': source.tags[ 6 ],
             '@@GLOBAL': updatedDataEquiv
         });
-        jest.runAllTimers();
         jest.useRealTimers();
         connection.disconnect();
     } );
@@ -307,7 +326,6 @@ describe( 'Connection class', () => {
         const { connection } = setup( source );
 
         expect( connection.get() ).toEqual({[ GLOBAL_SELECTOR ]: source });
-        jest.runAllTimers();
         
         connection.set({
             friends: { [ MOVE_TAG ]: [ -1, 1 ] },
@@ -331,8 +349,7 @@ describe( 'Connection class', () => {
         expectedValue.tags = [ 0, 1, 2, 4, 6 ].map( i => defaultState.tags[ i ] );
 
         expect( connection.get() ).toEqual({[ GLOBAL_SELECTOR ]: expectedValue });
-        jest.runAllTimers();
-
+       
         connection.disconnect();
 
         jest.useRealTimers();
@@ -351,7 +368,7 @@ describe( 'Connection class', () => {
             'tags[6]',
             '@@GLOBAL'
         );
-        jest.runAllTimers();
+        
         const data2 = connection.get(
             'friends[1].name.last',
             'history.places[2].country',
@@ -359,7 +376,7 @@ describe( 'Connection class', () => {
             'company',
             'tags[5]',
         );
-        jest.runAllTimers();
+        
         expect( data1 ).toEqual({
             'history.places[2].city': source.history.places[ 2 ].city,
             'history.places[2].country': source.history.places[ 2 ].country,

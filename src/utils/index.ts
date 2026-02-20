@@ -45,6 +45,17 @@ export function arrangePropertyPaths( propertyPaths : Array<string> ) : Array<st
 	return Object.keys( superPathTokensMap );
 }
 
+export function isAPrefixOfB<T>(
+	{ length: aLen, ...a } : Array<T>,
+	b : Array<T>
+) {
+	if( aLen > b.length ) { return false }
+	for( let i = 0; i < aLen; i++ ) {
+		if( a[ i ] !== b[ i ] ) { return false }
+	}
+	return true;
+}
+
 /** Checks if value is either a plain object or an array */
 export function isDataContainer( v ) { return isPlainObject( v ) || Array.isArray( v ) }
 

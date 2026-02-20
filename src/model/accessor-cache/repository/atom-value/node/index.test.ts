@@ -126,7 +126,7 @@ describe( 'AtomNode class', () => {
 					node.value = value;
 					expect( isReadonly( node.value ) ).toBe( true );
 				} );
-				test( 'ensures that all atom values of atoms up the are readonly', () => {
+				test( 'ensures that all atom values of atoms up the tree are readonly', () => {
 					let { root } = createTestAtomArtifact({} as Data);
 					let node = root.findActiveNodeAt([ 'a', 'b', 'c', 'd', 'e' ])!;
 					let value = { message: 'this is the test....' } as unknown as typeof node.value;
