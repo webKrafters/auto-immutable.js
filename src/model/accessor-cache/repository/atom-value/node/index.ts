@@ -11,6 +11,7 @@ import cloneDeep from '@webkrafters/clone-total';
 import { GLOBAL_SELECTOR } from '../../../../..';
 
 import {
+	isAPrefixOfB,
 	isPlainObject,
 	isString,
 	makeReadonly,
@@ -215,8 +216,7 @@ class AtomNode<T extends Value>{
 		if( !activeNode ) {
 			if( node.isRoot ) { return }
 			for( let dNodes = node._findNearestActiveDescendants(), d = dNodes.length; d--; ) {
-				// istanbul ignore next
-				if( !dNodes[ d ].isRootAtom ) { continue }
+				if( !isAPrefixOfB( fullPath, dNodes[ d ].fullPath ) ) { continue }
 				dNodes[ d ].value = get( value, dNodes[ d ].fullPath.slice( fullPathLen ) )._value as T;
 			}
 			return;
